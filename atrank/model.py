@@ -1,10 +1,13 @@
 import os
 import json
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+
+# モデルのクラスを定義
 
 class Model(object):
   def __init__(self, config, cate_list):
+    """config：設定、cate_list：商品のカテゴリ（ASINのID順）"""
     self.config = config
 
     # Summary Writer
@@ -18,6 +21,11 @@ class Model(object):
 
 
   def init_placeholders(self):
+    """
+    プレースホルダーの定義
+    プレースホルダーは変数Variableと違い、初期化時にインスタンスを与える必要がない。
+    セッション毎にデータが与えられる場合に用いられる。
+    """
     # [B] user id
     self.u = tf.placeholder(tf.int32, [None,])
 
@@ -44,6 +52,8 @@ class Model(object):
 
 
   def build_model(self, cate_list):
+    """モデルの構築"""
+    # 変数の定義
     item_emb_w = tf.get_variable(
         "item_emb_w",
         [self.config['item_count'], self.config['itemid_embedding_size']])
@@ -56,6 +66,8 @@ class Model(object):
         [self.config['cate_count'], self.config['cateid_embedding_size']])
     cate_list = tf.convert_to_tensor(cate_list, dtype=tf.int64)
 
+    # アイテム埋め込みとカテゴリ埋め込みと時間の埋め込みを結合、それをDenseで写像する
+    # 論文：p3左のu_ij=h_emb
     i_emb = tf.concat([
         tf.nn.embedding_lookup(item_emb_w, self.i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.i)),
@@ -77,14 +89,18 @@ class Model(object):
                               activation=tf.nn.tanh)
       h_emb += t_emb
 
-
+    # !一つしか潜在空間がない
     num_blocks = self.config['num_blocks']
     num_heads = self.config['num_heads']
     dropout_rate = self.config['dropout']
     num_units = h_emb.get_shape().as_list()[-1]
 
+    # セルフアテンションを適用
+    # 論文：p4左数式(3)
     u_emb, self.att, self.stt = attention_net(
+        # uij
         h_emb,
+        # ユーザーの履歴の長さ
         self.sl,
         i_emb,
         num_units,
@@ -94,6 +110,8 @@ class Model(object):
         self.is_training,
         False)
 
+    # 予測
+    # 論文：p4右数式(7)&(8) f(h_t, et_u)
     self.logits = i_b + tf.reduce_sum(tf.multiply(u_emb, i_emb), 1)
 
     # ============== Eval ===============
@@ -106,6 +124,7 @@ class Model(object):
     self.global_epoch_step_op = \
         tf.assign(self.global_epoch_step, self.global_epoch_step+1)
 
+    # ロスの定義
     # Loss
     l2_norm = tf.add_n([
         tf.nn.l2_loss(u_emb),
@@ -131,6 +150,8 @@ class Model(object):
 
 
   def init_optimizer(self):
+    """最適化アルゴリズムの設定"""
+    # 論文だとSGDを利用、lrは1.0→0.1に変化するようになっている
     # Gradients and SGD update operation for training the model
     trainable_params = tf.trainable_variables()
     if self.config['optimizer'] == 'adadelta':
@@ -156,6 +177,7 @@ class Model(object):
 
 
   def train(self, sess, uij, l, add_summary=False):
+    """行動とラベルを入力して学習する"""
 
     input_feed = {
         self.u: uij[0],
@@ -182,6 +204,7 @@ class Model(object):
     return outputs[0]
 
   def eval(self, sess, uij):
+    """モデルの評価を行う"""
     res1 = sess.run(self.eval_logits, feed_dict={
         self.u: uij[0],
         self.i: uij[1],
@@ -201,6 +224,7 @@ class Model(object):
     return np.mean(res1 - res2 > 0)
 
   def test(self, sess, uij):
+    """uijを使ってテスト用の結果を生成"""
     res1, att_1, stt_1 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
         self.u: uij[0],
         self.i: uij[1],
@@ -238,8 +262,15 @@ class Model(object):
 
 
 def attention_net(enc, sl, dec, num_units, num_heads, num_blocks, dropout_rate, is_training, reuse):
+  """
+  トランスフォーマー
+  論文：p4 Self-Attention Layer
+  enc：ユーザー埋め込み表現
+  sl：履歴の長さ
+  """
   with tf.variable_scope("all", reuse=reuse):
     with tf.variable_scope("user_hist_group"):
+      # エンコーダー
       for i in range(num_blocks):
         with tf.variable_scope("num_blocks_{}".format(i)):
           ### Multihead Attention
@@ -261,6 +292,7 @@ def attention_net(enc, sl, dec, num_units, num_heads, num_blocks, dropout_rate, 
 
     dec = tf.expand_dims(dec, 1)
     with tf.variable_scope("item_feature_group"):
+      # デコーダー
       for i in range(num_blocks):
         with tf.variable_scope("num_blocks_{}".format(i)):
           ## Multihead Attention ( vanilla attention)
@@ -311,6 +343,9 @@ def multihead_attention(queries,
   Returns
     A 3d tensor with shape of (N, T_q, C)
   '''
+  """
+  マルチヘットアテンション
+  """
   with tf.variable_scope(scope, reuse=reuse):
     # Set the fall back option for num_units
     if num_units is None:
@@ -390,6 +425,7 @@ def feedforward(inputs,
   Returns:
     A 3d tensor with the same shape and dtype as inputs
   '''
+  """トランスフォーマーのFeed Forwardと残差接続"""
   with tf.variable_scope(scope, reuse=reuse):
     # Inner layer
     params = {"inputs": inputs, "filters": num_units[0], "kernel_size": 1,
@@ -426,6 +462,7 @@ def normalize(inputs,
   Returns:
     A tensor with the same shape and data dtype as `inputs`.
   '''
+  """レイヤー正規化を行う"""
   with tf.variable_scope(scope, reuse=reuse):
     inputs_shape = inputs.get_shape()
     params_shape = inputs_shape[-1:]

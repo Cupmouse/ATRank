@@ -6,14 +6,19 @@ import random
 from collections import OrderedDict
 
 import numpy as np
-import tensorflow as tf
+# TensorFlow v1との互換性の維持
+import tensorflow.compat.v1 as tf
 
 from input import DataInput, DataInputTest
 from model import Model
 
+# ランダムシードの設定
+
 random.seed(1234)
 np.random.seed(1234)
 tf.set_random_seed(1234)
+
+# コマンドラインオプションの定義
 
 # pylint: disable=line-too-long
 # Network parameters
@@ -50,6 +55,7 @@ tf.app.flags.DEFINE_float('per_process_gpu_memory_fraction', 0.0, 'Gpu memory us
 FLAGS = tf.app.flags.FLAGS
 
 def create_model(sess, config, cate_list):
+  """モデルを読み込む"""
 
   print(json.dumps(config, indent=4), flush=True)
   model = Model(config, cate_list)
@@ -75,6 +81,7 @@ def create_model(sess, config, cate_list):
   return model
 
 def _eval(sess, test_set, model):
+  """評価を行う"""
 
   auc_sum = 0.0
   for _, uij in DataInputTest(test_set, FLAGS.test_batch_size):
@@ -90,6 +97,8 @@ def _eval(sess, test_set, model):
 
 
 def train():
+  """学習ループ"""
+  
   start_time = time.time()
 
   if FLAGS.from_scratch:
@@ -125,6 +134,7 @@ def train():
   config['cate_count'] = cate_count
 
 
+  # ココから学習
   # Initiate TF session
   with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
 
@@ -144,10 +154,12 @@ def train():
 
     start_time, avg_loss, best_auc = time.time(), 0.0, 0.0
     for _ in range(FLAGS.max_epochs):
+      # エポックループ
 
       random.shuffle(train_set)
 
       for _, uij in DataInput(train_set, FLAGS.train_batch_size):
+        # バッチループ
 
         add_summary = bool(model.global_step.eval() % FLAGS.display_freq == 0)
         step_loss = model.train(sess, uij, lr, add_summary)

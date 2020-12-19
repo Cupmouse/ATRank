@@ -2,6 +2,7 @@ import pickle
 import pandas as pd
 
 def to_df(file_path):
+  """pandasのデータフレームに変換"""
   with open(file_path, 'r') as fin:
     df = {}
     i = 0

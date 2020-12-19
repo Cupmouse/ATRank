@@ -4,6 +4,7 @@ import numpy as np
 
 random.seed(1234)
 
+# データセットの読み込みと利用する要素の選択
 with open('../raw_data/reviews.pkl', 'rb') as f:
   reviews_df = pickle.load(f)
   reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
@@ -14,11 +15,13 @@ with open('../raw_data/meta.pkl', 'rb') as f:
 
 
 def build_map(df, col_name):
+  """キーをユニークなIDに変換する。そのキーとそのIDをマッピングする辞書との逆処理の配列を返す"""
   key = sorted(df[col_name].unique().tolist())
   m = dict(zip(key, range(len(key))))
   df[col_name] = df[col_name].map(lambda x: m[x])
   return m, key
 
+# 商品、カテゴリ、レビュアーのIDを整数へ変換
 asin_map, asin_key = build_map(meta_df, 'asin')
 cate_map, cate_key = build_map(meta_df, 'categories')
 revi_map, revi_key = build_map(reviews_df, 'reviewerID')
@@ -35,10 +38,12 @@ reviews_df = reviews_df.sort_values(['reviewerID', 'unixReviewTime'])
 reviews_df = reviews_df.reset_index(drop=True)
 reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
 
+# ASINの並び順に商品のカテゴリだけをとってきて配列にする（ラベル？）
 cate_list = [meta_df['categories'][i] for i in range(len(asin_map))]
 cate_list = np.array(cate_list, dtype=np.int32)
 
 
+# 書き出し
 with open('../raw_data/remap.pkl', 'wb') as f:
   pickle.dump(reviews_df, f, pickle.HIGHEST_PROTOCOL) # uid, iid
   pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL) # cid of iid line

@@ -1,5 +1,7 @@
 #! /bin/bash
 
+# AmazonのElectronicsカテゴリのデータセットをダウンロードして解凍する
+
 cd ../raw_data
 wget -c http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/reviews_Electronics_5.json.gz
 gzip -d reviews_Electronics_5.json.gz
