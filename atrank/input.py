@@ -2,7 +2,8 @@ import numpy as np
 
 class DataInput:
   def __init__(self, data, batch_size):
-
+    
+    #データサイズ、batch_sizeからepoch_sizeを決定
     self.batch_size = batch_size
     self.data = data
     self.epoch_size = len(self.data) // self.batch_size
@@ -13,15 +14,19 @@ class DataInput:
   def __iter__(self):
     return self
 
+  #次の状態(i)とデータを出力
   def __next__(self):
 
     if self.i == self.epoch_size:
       raise StopIteration
 
+    #次入力するデータを現在の状態iに従って持ってくる
     ts = self.data[self.i * self.batch_size : min((self.i+1) * self.batch_size,
                                                   len(self.data))]
+    #次に学習するデータの場所
     self.i += 1
 
+    #今回入力するデータを整形
     u, i, y, sl = [], [], [], []
     for t in ts:
       u.append(t[0])
@@ -45,6 +50,7 @@ class DataInput:
 class DataInputTest:
   def __init__(self, data, batch_size):
 
+    #epoch_sizeを決定
     self.batch_size = batch_size
     self.data = data
     self.epoch_size = len(self.data) // self.batch_size
@@ -55,15 +61,20 @@ class DataInputTest:
   def __iter__(self):
     return self
 
+  #次の状態(i)とデータを出力
   def __next__(self):
 
     if self.i == self.epoch_size:
       raise StopIteration
 
+    #今回入力するデータを現在の状態iに従って持ってくる
     ts = self.data[self.i * self.batch_size : min((self.i+1) * self.batch_size,
                                                   len(self.data))]
+    #次の状態
     self.i += 1
 
+    #今回入力するデータを整形
+    #DataInputと違うのはこの部分
     u, i, j, sl = [], [], [], []
     for t in ts:
       u.append(t[0])
