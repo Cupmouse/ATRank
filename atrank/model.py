@@ -47,7 +47,9 @@ class Model(object):
     self.sl = tf.placeholder(tf.int32, [None,])
 
     # learning rate
-    self.lr = tf.placeholder(tf.float64, [])
+    # float64と32同士の演算を行うとエラーになるため、学習率をfloat32に変える
+    # self.lr = tf.placeholder(tf.float64, [])
+    self.lr = tf.placeholder(tf.float32, [])
 
     # whether it's training or not
     self.is_training = tf.placeholder(tf.bool, [])

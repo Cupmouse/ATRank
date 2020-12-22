@@ -127,8 +127,8 @@ def train():
 
   # Build Config
   config = OrderedDict(sorted(FLAGS.__flags.items()))
-  # for k, v in config.items():
-  #   config[k] = v.value
+  for k, v in config.items():
+    config[k] = v.value
   config['user_count'] = user_count
   config['item_count'] = item_count
   config['cate_count'] = cate_count
