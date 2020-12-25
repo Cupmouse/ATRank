@@ -3,3 +3,4 @@
 *.json
 __pycache__
 save_path
+raw_data

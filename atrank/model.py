@@ -197,6 +197,7 @@ class Model(object):
   def train(self, sess, uij, l, add_summary=False):
     """行動とラベルを入力して学習する"""
 
+    # uij = (u, i, j, hist_i, hist_t, sl)
     input_feed = {
         self.u: uij[0],
         self.i: uij[1],
