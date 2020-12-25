@@ -36,6 +36,9 @@ class Model(object):
 
     # [B] item label
     self.y = tf.placeholder(tf.float32, [None,])
+    
+    # review text
+    self.r = tf.placeholder(tf.float32, [None, None])
 
     # [B, T] user's history item id
     self.hist_i = tf.placeholder(tf.int32, [None, None])
@@ -72,6 +75,10 @@ class Model(object):
     cate_emb_w = tf.get_variable(
         "cate_emb_w",
         [self.config['cate_count'], self.config['cateid_embedding_size']])
+    # レビュー文の埋め込み表現が保存される行列 [|I|, 300]
+    rev_emb_w = tf.get_variable(
+        "rev_emb_w",
+        [self.config['item_count'], self.config['rev_embedding_size']])
     # 各商品のIDとカテゴリIDのマップ（リスト） [|I|]
     cate_list = tf.convert_to_tensor(cate_list, dtype=tf.int64)
 
@@ -89,6 +96,7 @@ class Model(object):
     h_emb = tf.concat([
         tf.nn.embedding_lookup(item_emb_w, self.hist_i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)),
+        tf.nn.embedding_lookup(rev_emb_w, self.hist_i),
         ], 2)
 
     if self.config['concat_time_emb'] == True:
@@ -197,11 +205,12 @@ class Model(object):
   def train(self, sess, uij, l, add_summary=False):
     """行動とラベルを入力して学習する"""
 
-    # uij = (u, i, j, hist_i, hist_t, sl)
+    # uij = (u, i, j, hist_i, hist_t, sl, r)
     input_feed = {
         self.u: uij[0],
         self.i: uij[1],
         self.y: uij[2],
+        self.r: uij[6],
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
@@ -227,6 +236,7 @@ class Model(object):
     res1 = sess.run(self.eval_logits, feed_dict={
         self.u: uij[0],
         self.i: uij[1],
+        self.r: uij[6],
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
@@ -235,6 +245,7 @@ class Model(object):
     res2 = sess.run(self.eval_logits, feed_dict={
         self.u: uij[0],
         self.i: uij[2],
+        self.r: uij[6],
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
@@ -247,6 +258,7 @@ class Model(object):
     res1, att_1, stt_1 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
         self.u: uij[0],
         self.i: uij[1],
+        self.r: uij[6],
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
@@ -255,6 +267,7 @@ class Model(object):
     res2, att_2, stt_2 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
         self.u: uij[0],
         self.i: uij[2],
+        self.r: uij[6],
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],

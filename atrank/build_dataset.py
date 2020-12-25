@@ -6,7 +6,9 @@ from sklearn import decomposition
 import pandas as pd
 import itertools
 import gc
+from gensim.models.wrappers import FastText
 
+toVec = FastText.load_fasttext_format('cc.en.300.bin')
 random.seed(1234)
 
 #user_count, item_count, cate_count, example_countはそれぞれユーザ、アイテム、カテゴリ、レビュー履歴の数
@@ -42,6 +44,22 @@ def proc_time_emb(hist_t, cur_t):
   hist_t = [np.sum(rel_time >= gap) for rel_time in hist_t]
   return hist_t
 
+def sec2vec(sentence):
+    words = sentence.split()
+    sum = np.zeros(300)
+    count = 0
+    for oneWord in words:
+        try:
+            sum += toVec[oneWord]
+            count += 1
+        except:
+            pass
+    
+    if count != 0:
+        return sum/count
+    else:
+        return sum
+
 train_set = []
 test_set = []
 # histは各reviewerIDについてのレビューデータ(reviewerID以外のカラム全て)
@@ -61,21 +79,28 @@ for reviewerID, hist in reviews_df.groupby('reviewerID'):
     return neg
   # 正例と同じ数だけ負例を生成
   neg_list = [gen_neg() for i in range(len(pos_list))]
+  #レビュー文をベクトル化
+  all_rev_list = hist['reviewText'].tolist()
+  all_rev_vec = []
+  for text in all_rev_list:
+    all_rev_vec.append(sec2vec(text))
+  
 
   # 訓練データを増やすために、元データをスライスする
   for i in range(1, len(pos_list)):
     hist_i = pos_list[:i]
     hist_t = proc_time_emb(tim_list[:i], tim_list[i])
+    rev_vec = all_rev_vec[:i]
     # 一番最後の履歴はテストに、他は訓練に入れる
     if i != len(pos_list) - 1:
-      # (ユーザー, 履歴, 履歴時間, ラベル, 正例なら1でないなら0)
-      train_set.append((reviewerID, hist_i, hist_t, pos_list[i], 1, img_list[pos_list[i]]))
-      train_set.append((reviewerID, hist_i, hist_t, neg_list[i], 0, img_list[neg_list[i]]))
+      # (ユーザー, 履歴, 履歴時間, ラベル, 正例なら1でないなら0、画像、レビュー文)
+      train_set.append((reviewerID, hist_i, hist_t, pos_list[i], 1, img_list[pos_list[i]]), rev_vec)
+      train_set.append((reviewerID, hist_i, hist_t, neg_list[i], 0, img_list[neg_list[i]]), rev_vec)
     else:
-      # (ユーザー, 履歴, 履歴時間, (正例,負例))
+      # (ユーザー, 履歴, 履歴時間, (正例,負例)、画像、レビュー文)
       label = (pos_list[i], neg_list[i])
       img = (img_list[label[0]], img_list[label[1]])
-      test_set.append((reviewerID, hist_i, hist_t, label, img))
+      test_set.append((reviewerID, hist_i, hist_t, label, img, rev_vec))
 
 # 訓練データからtSVD(PCA)を訓練し次元削減
 train_img = pd.Series(pd.Series([ts[5] for ts in train_set]).unique())

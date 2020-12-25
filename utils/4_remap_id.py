@@ -11,7 +11,7 @@ with open('../raw_data/image_embeddings.pkl', 'rb') as f:
 # データセットの読み込みと利用する要素の選択
 with open('../raw_data/reviews.pkl', 'rb') as f:
   reviews_df = pickle.load(f)
-  reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
+  reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime', 'reviewText']]
 with open('../raw_data/meta.pkl', 'rb') as f:
   meta_df = pickle.load(f)
   meta_df = meta_df[['asin', 'categories', 'imUrl']]
@@ -50,7 +50,7 @@ meta_df = meta_df.reset_index(drop=True)
 reviews_df['asin'] = reviews_df['asin'].map(lambda x: asin_map[x])
 reviews_df = reviews_df.sort_values(['reviewerID', 'unixReviewTime'])
 reviews_df = reviews_df.reset_index(drop=True)
-reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
+reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime', 'reviewText']]
 
 # ASINの並び順に商品のカテゴリだけをとってきて配列にする
 cate_list = [meta_df['categories'][i] for i in range(len(asin_map))]

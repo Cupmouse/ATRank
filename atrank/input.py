@@ -42,12 +42,14 @@ class DataInput:
     # u:ユーザーID
     # i:ラベル
     # y:正例なら1、負例なら0
+    # r:レビュー文
     # sl:履歴の長さ
-    u, i, y, sl = [], [], [], []
+    u, i, y, r, sl = [], [], [], [], []
     for t in ts:
       u.append(t[0])
       i.append(t[3])
       y.append(t[4])
+      r.append(t[6][0])
       sl.append(len(t[1]))
     
     # 最大の履歴の長さに合わせて行列を初期化する
@@ -69,7 +71,7 @@ class DataInput:
         hist_t[k][l] = t[2][l]
       k += 1
 
-    return self.i, (u, i, y, hist_i, hist_t, sl)
+    return self.i, (u, i, y, hist_i, hist_t, sl, r)
 
 class DataInputTest:
   """DataInputのテストデータバージョン"""
@@ -102,12 +104,14 @@ class DataInputTest:
     # u:ユーザーID
     # i:正例のラベル
     # j:負例のラベル
+    # r:レビュー文
     # sl:履歴の長さ
-    u, i, j, sl = [], [], [], []
+    u, i, j, r, sl = [], [], [], [], []
     for t in ts:
       u.append(t[0])
       i.append(t[3][0])
       j.append(t[3][1])
+      r.append(t[5][0])
       sl.append(len(t[1]))
     max_sl = max(sl)
 
@@ -121,4 +125,4 @@ class DataInputTest:
         hist_t[k][l] = t[2][l]
       k += 1
 
-    return self.i, (u, i, j, hist_i, hist_t, sl)
+    return self.i, (u, i, j, hist_i, hist_t, sl, r)
