@@ -40,20 +40,28 @@ class DataInput:
 
     # 行列へ入れ込む
     # u:ユーザーID
-    # i:ラベル
+    # i:ラベル(予測する商品のID)
     # y:正例なら1、負例なら0
     # r:レビュー文
+    # im:画像
     # sl:履歴の長さ
-    u, i, y, r, sl = [], [], [], [], []
+    u, i, y, r, img, sl = [], [], [], [], [], []
     for t in ts:
       u.append(t[0])
       i.append(t[3])
       y.append(t[4])
-      r.append(t[6][0])
+      r.append(t[6])
+      img.append(t[5])
       sl.append(len(t[1]))
     
     # 最大の履歴の長さに合わせて行列を初期化する
     max_sl = max(sl)
+    
+    ra = np.zeros([len(ts), max_sl, 300], np.float32)
+    for t in range(len(ts)):
+        for l in range(len(r[t])):
+            for m in range(300):
+                ra[t][l][m] = r[t][l][m]
 
     # hist_i:行動履歴
     hist_i = np.zeros([len(ts), max_sl], np.int64)
@@ -71,7 +79,7 @@ class DataInput:
         hist_t[k][l] = t[2][l]
       k += 1
 
-    return self.i, (u, i, y, hist_i, hist_t, sl, r)
+    return self.i, (u, i, y, hist_i, hist_t, sl, ra, img)
 
 class DataInputTest:
   """DataInputのテストデータバージョン"""
@@ -102,19 +110,29 @@ class DataInputTest:
     # 今回入力するデータを整形
     # DataInputと違うのはこの部分
     # u:ユーザーID
-    # i:正例のラベル
-    # j:負例のラベル
+    # i:正例のラベル(予測する商品のID)
+    # j:負例のラベル(予測する商品のID)
     # r:レビュー文
     # sl:履歴の長さ
-    u, i, j, r, sl = [], [], [], [], []
+    u, i, j, r, img, sl = [], [], [], [], [], []
     for t in ts:
       u.append(t[0])
       i.append(t[3][0])
       j.append(t[3][1])
-      r.append(t[5][0])
+      r.append(t[5])
+      img.append(t[4])
       sl.append(len(t[1]))
     max_sl = max(sl)
+    
+    ra = np.zeros([len(ts), max_sl, 300], np.float32)
+    
+    for t in range(len(ts)):
+      for l in range(len(r[t])):
+        for m in range(300):
+          ra[t][l][m] = r[t][l][m]
+    
 
+    #hist_i、hist_tの形を入力長で固定させる
     hist_i = np.zeros([len(ts), max_sl], np.int64)
     hist_t = np.zeros([len(ts), max_sl], np.float32)
 
@@ -125,4 +143,4 @@ class DataInputTest:
         hist_t[k][l] = t[2][l]
       k += 1
 
-    return self.i, (u, i, j, hist_i, hist_t, sl, r)
+    return self.i, (u, i, j, hist_i, hist_t, sl, ra, img)

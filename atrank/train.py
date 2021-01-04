@@ -158,9 +158,14 @@ def train():
       # エポックループ
 
       random.shuffle(train_set)
+      count = 0
 
       for _, uij in DataInput(train_set, FLAGS.train_batch_size):
         # バッチループ
+        #ループが遅いのでバッチサイズを1000にした
+        if count > 1000:
+            break
+        count += 1
 
         add_summary = bool(model.global_step.eval() % FLAGS.display_freq == 0)
         step_loss = model.train(sess, uij, lr, add_summary)

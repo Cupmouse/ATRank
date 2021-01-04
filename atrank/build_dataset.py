@@ -64,7 +64,7 @@ train_set = []
 test_set = []
 # histは各reviewerIDについてのレビューデータ(reviewerID以外のカラム全て)
 for reviewerID, hist in reviews_df.groupby('reviewerID'):
-  # 正例のラベル
+  # 正例のラベル(商品のID)
   pos_list = hist['asin'].tolist()
   # 時間のリスト
   tim_list = hist['unixReviewTime'].tolist()
@@ -93,9 +93,9 @@ for reviewerID, hist in reviews_df.groupby('reviewerID'):
     rev_vec = all_rev_vec[:i]
     # 一番最後の履歴はテストに、他は訓練に入れる
     if i != len(pos_list) - 1:
-      # (ユーザー, 履歴, 履歴時間, ラベル, 正例なら1でないなら0、画像、レビュー文)
-      train_set.append((reviewerID, hist_i, hist_t, pos_list[i], 1, img_list[pos_list[i]]), rev_vec)
-      train_set.append((reviewerID, hist_i, hist_t, neg_list[i], 0, img_list[neg_list[i]]), rev_vec)
+      # (ユーザー, 履歴, 履歴時間, ラベル(予測する商品のID), 正例なら1でないなら0、画像(予測する商品の画像？)、レビュー文)
+      train_set.append((reviewerID, hist_i, hist_t, pos_list[i], 1, img_list[pos_list[i]], rev_vec))
+      train_set.append((reviewerID, hist_i, hist_t, neg_list[i], 0, img_list[neg_list[i]], rev_vec))
     else:
       # (ユーザー, 履歴, 履歴時間, (正例,負例)、画像、レビュー文)
       label = (pos_list[i], neg_list[i])
