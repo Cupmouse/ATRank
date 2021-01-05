@@ -63,6 +63,7 @@ class Model(object):
 
     # 変数の定義
     # 商品の埋め込み表現が保存される行列 [|I|, di]
+    # ２次元のルックアップテーブル
     item_emb_w = tf.get_variable(
         "item_emb_w",
         [self.config['item_count'], self.config['itemid_embedding_size']])
@@ -72,6 +73,7 @@ class Model(object):
         [self.config['item_count'],],
         initializer=tf.constant_initializer(0.0))
     # カテゴリの埋め込み表現が保存される行列 [|A|, da]
+    # ２次元のルックアップテーブル
     cate_emb_w = tf.get_variable(
         "cate_emb_w",
         [self.config['cate_count'], self.config['cateid_embedding_size']])
@@ -89,6 +91,7 @@ class Model(object):
     i_b = tf.gather(item_b, self.i)
 
     # 入力する各履歴の埋め込み表現 [B, T, di+da]
+    # embedding_lookupでルックアップテーブルから該当する埋め込み表現を持ってくる
     h_emb = tf.concat([
         tf.nn.embedding_lookup(item_emb_w, self.hist_i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)),

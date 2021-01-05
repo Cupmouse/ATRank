@@ -49,7 +49,7 @@ train_set = []
 test_set = []
 # histは各reviewerIDについてのレビューデータ(reviewerID以外のカラム全て)
 for reviewerID, hist in reviews_df.groupby('reviewerID'):
-  # 正例のラベル
+  # 正例のラベル(商品のID)
   pos_list = hist['asin'].tolist()
   # 時間のリスト
   tim_list = hist['unixReviewTime'].tolist()
