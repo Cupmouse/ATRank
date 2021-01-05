@@ -8,23 +8,28 @@ random.seed(1234)
 # 画像埋め込み表現の読み込み
 with open('../raw_data/image_embeddings.pkl', 'rb') as f:
   image_embeddings = pickle.load(f)
+# テキスト表現の読み込み
+with open('../raw_data/texts.pkl', 'rb') as f:
+  texts = pickle.load(f)
 # データセットの読み込みと利用する要素の選択
 with open('../raw_data/reviews.pkl', 'rb') as f:
   reviews_df = pickle.load(f)
   reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime', 'reviewText']]
+for i in range(len(reviews_df)):
+  reviews_df.reviewText.iat[i] = texts[i]
+texts = None
 with open('../raw_data/meta.pkl', 'rb') as f:
   meta_df = pickle.load(f)
   meta_df = meta_df[['asin', 'categories', 'imUrl']]
-  meta_df['categories'] = meta_df['categories'].map(lambda x: x[-1][-1])
-  # URLを画像埋め込み表現を取得するためのキーへ変換する
-  def url_to_key(url):
-    if isinstance(url, str):
-      key = os.path.basename(url)
-      if key in image_embeddings:
-        return key
-    return 'not_available'
-  meta_df['imUrl'] = meta_df['imUrl'].map(url_to_key)
-
+meta_df['categories'] = meta_df['categories'].map(lambda x: x[-1][-1])
+# URLを画像埋め込み表現を取得するためのキーへ変換する
+def url_to_key(url):
+  if isinstance(url, str):
+    key = os.path.basename(url)
+    if key in image_embeddings:
+      return key
+  return 'not_available'
+meta_df['imUrl'] = meta_df['imUrl'].map(url_to_key)
 
 def build_map(df, col_name):
   """キーをユニークなIDに変換する。そのキーとそのIDをマッピングする辞書との逆処理の配列を返す"""

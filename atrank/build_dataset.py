@@ -1,4 +1,4 @@
-#データセットのファイルを読み込み、埋め込みしやすい形に直して保存する
+# データセットのファイルを読み込み、埋め込みしやすい形に直して保存する
 import random
 import pickle
 import numpy as np
@@ -6,12 +6,10 @@ from sklearn import decomposition
 import pandas as pd
 import itertools
 import gc
-from gensim.models.wrappers import FastText
 
-toVec = FastText.load_fasttext_format('cc.en.300.bin')
 random.seed(1234)
 
-#user_count, item_count, cate_count, example_countはそれぞれユーザ、アイテム、カテゴリ、レビュー履歴の数
+# user_count, item_count, cate_count, example_countはそれぞれユーザ、アイテム、カテゴリ、レビュー履歴の数
 with open('../raw_data/remap.pkl', 'rb') as f:
   # asinが整数になっているレビューのデータ
   reviews_df = pickle.load(f)
@@ -23,6 +21,9 @@ with open('../raw_data/remap.pkl', 'rb') as f:
 
 with open('../raw_data/image_embeddings.pkl', 'rb') as f:
   image_embeddings = pickle.load(f)
+
+with open('../raw_data/texts.pkl', 'rb') as f:
+  text_embeddings = pickle.load(f)
 
 # 時間をカテゴリカルな値にするためのテーブル
 # [1, 2) = 0, [2, 4) = 1, [4, 8) = 2, [8, 16) = 3...  need len(gap) hot
@@ -44,22 +45,6 @@ def proc_time_emb(hist_t, cur_t):
   hist_t = [np.sum(rel_time >= gap) for rel_time in hist_t]
   return hist_t
 
-def sec2vec(sentence):
-    words = sentence.split()
-    sum = np.zeros(300)
-    count = 0
-    for oneWord in words:
-        try:
-            sum += toVec[oneWord]
-            count += 1
-        except:
-            pass
-    
-    if count != 0:
-        return sum/count
-    else:
-        return sum
-
 train_set = []
 test_set = []
 # histは各reviewerIDについてのレビューデータ(reviewerID以外のカラム全て)
@@ -79,31 +64,32 @@ for reviewerID, hist in reviews_df.groupby('reviewerID'):
     return neg
   # 正例と同じ数だけ負例を生成
   neg_list = [gen_neg() for i in range(len(pos_list))]
-  #レビュー文をベクトル化
-  all_rev_list = hist['reviewText'].tolist()
-  all_rev_vec = []
-  for text in all_rev_list:
-    all_rev_vec.append(sec2vec(text))
   
-
   # 訓練データを増やすために、元データをスライスする
   for i in range(1, len(pos_list)):
     hist_i = pos_list[:i]
     hist_t = proc_time_emb(tim_list[:i], tim_list[i])
-    rev_vec = all_rev_vec[:i]
+    # レビュー履歴の商品の画像のID列
+    hist_img = img_list[:i]
+    # レビュー履歴のレビューの文章の埋め込み表現
+    hist_text = text_embeddings[hist_i]
     # 一番最後の履歴はテストに、他は訓練に入れる
     if i != len(pos_list) - 1:
       # (ユーザー, 履歴, 履歴時間, ラベル, 正例なら1でないなら0、画像、レビュー文)
-      train_set.append((reviewerID, hist_i, hist_t, pos_list[i], 1, img_list[pos_list[i]]), rev_vec)
-      train_set.append((reviewerID, hist_i, hist_t, neg_list[i], 0, img_list[neg_list[i]]), rev_vec)
+      train_set.append((reviewerID, hist_i, hist_t, pos_list[i], 1, hist_img, hist_text))
+      train_set.append((reviewerID, hist_i, hist_t, neg_list[i], 0, hist_img, hist_text))
     else:
       # (ユーザー, 履歴, 履歴時間, (正例,負例)、画像、レビュー文)
       label = (pos_list[i], neg_list[i])
-      img = (img_list[label[0]], img_list[label[1]])
-      test_set.append((reviewerID, hist_i, hist_t, label, img, rev_vec))
+      test_set.append((reviewerID, hist_i, hist_t, label, hist_img, hist_text))
+
+text_embeddings = None
+
+print('processing images')
 
 # 訓練データからtSVD(PCA)を訓練し次元削減
-train_img = pd.Series(pd.Series([ts[5] for ts in train_set]).unique())
+train_img = itertools.chain.from_iterable([ts[5] for ts in train_set])
+train_img = pd.Series(pd.Series(train_img).unique())
 train_img = train_img.map(lambda id: img_key[id]) # in key
 train_img = train_img[train_img != 'not_available']
 # 辞書：キー→PCAで訓練された画像の配列のIndex
@@ -112,23 +98,26 @@ train_img = train_img.map(lambda key: image_embeddings[key]).to_list()
 image_tsvd = decomposition.TruncatedSVD(n_components=64, random_state=1234)
 train_img = image_tsvd.fit_transform(train_img)
 # 画像が存在しない場合の代わり
-image_placeholder = np.sum(train_img, axis=0)
+image_placeholder = np.mean(train_img, axis=0)
 # 学習セットの画像IDをPCAを通した特徴に置き換え
 for i, ts in enumerate(train_set):
-  key = img_key[ts[5]]
+  keys = [img_key[id] for id in ts[5]]
+  imgs = np.ndarray((len(keys), len(image_placeholder)))
+  for j, key in enumerate(keys):
+    if key in train_img_map:
+      # 埋め込み表現がある
+      imgs[j] = train_img[train_img_map[key]]
+    else:
+      # 埋め込み表現がない
+      imgs[j] = image_placeholder
   ts = list(ts)
-  if key in train_img_map:
-    # 埋め込み表現がある
-    ts[5] = train_img[train_img_map[key]]
-  else:
-    # 埋め込み表現がない
-    ts[5] = image_placeholder
+  ts[5] = imgs
   train_set[i] = tuple(ts)
 
 gc.collect()
 
 # テストセットについても同様
-test_img = itertools.chain.from_iterable([list(ts[4]) for ts in test_set])
+test_img = itertools.chain.from_iterable([ts[4] for ts in test_set])
 test_img = pd.Series(pd.Series(test_img).unique())
 test_img = test_img.map(lambda id: img_key[id])
 test_img = test_img[test_img != 'not_available']
@@ -138,13 +127,12 @@ test_img = test_img.map(lambda key: image_embeddings[key]).to_list()
 image_embeddings = None
 test_img = image_tsvd.transform(test_img)
 for i, ts in enumerate(test_set):
-  key_1 = img_key[ts[4][0]]
-  key_2 = img_key[ts[4][1]]
+  keys = [img_key[id] for id in ts[4]]
+  imgs = [train_img[train_img_map[key]] if key in train_img_map else image_placeholder for key in keys]
+  imgs = np.array(imgs)
   ts = list(ts)
-  img_1 = test_img[test_img_map[key_1]] if key_1 in test_img_map else image_placeholder
-  img_2 = test_img[test_img_map[key_2]] if key_2 in test_img_map else image_placeholder
-  ts[4] = (img_1, img_2)
-  test_set[i] = tuple(ts)
+  ts[4] = imgs
+  train_set[i] = tuple(ts)
 
 # シャフル
 random.shuffle(train_set)

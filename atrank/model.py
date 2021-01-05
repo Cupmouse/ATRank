@@ -37,14 +37,14 @@ class Model(object):
     # [B] item label
     self.y = tf.placeholder(tf.float32, [None,])
     
-    # review text
-    self.r = tf.placeholder(tf.float32, [None, None])
-
     # [B, T] user's history item id
     self.hist_i = tf.placeholder(tf.int32, [None, None])
 
     # [B, T] user's history item purchase time
     self.hist_t = tf.placeholder(tf.int32, [None, None])
+
+    # [B, T, d_r] review text
+    self.r = tf.placeholder(tf.float32, [None, None, self.config['input_text_emb_size']])
 
     # [B] valid length of `hist_i`
     self.sl = tf.placeholder(tf.int32, [None,])
@@ -75,10 +75,6 @@ class Model(object):
     cate_emb_w = tf.get_variable(
         "cate_emb_w",
         [self.config['cate_count'], self.config['cateid_embedding_size']])
-    # レビュー文の埋め込み表現が保存される行列 [|I|, 300]
-    rev_emb_w = tf.get_variable(
-        "rev_emb_w",
-        [self.config['item_count'], self.config['rev_embedding_size']])
     # 各商品のIDとカテゴリIDのマップ（リスト） [|I|]
     cate_list = tf.convert_to_tensor(cate_list, dtype=tf.int64)
 
@@ -96,7 +92,7 @@ class Model(object):
     h_emb = tf.concat([
         tf.nn.embedding_lookup(item_emb_w, self.hist_i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)),
-        tf.nn.embedding_lookup(rev_emb_w, self.hist_i),
+        self.r,
         ], 2)
 
     if self.config['concat_time_emb'] == True:
@@ -210,10 +206,10 @@ class Model(object):
         self.u: uij[0],
         self.i: uij[1],
         self.y: uij[2],
-        self.r: uij[6],
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
+        self.r: uij[7],
         self.lr: l,
         self.is_training: True,
         }
@@ -236,19 +232,19 @@ class Model(object):
     res1 = sess.run(self.eval_logits, feed_dict={
         self.u: uij[0],
         self.i: uij[1],
-        self.r: uij[6],
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
+        self.r: uij[7],
         self.is_training: False,
         })
     res2 = sess.run(self.eval_logits, feed_dict={
         self.u: uij[0],
         self.i: uij[2],
-        self.r: uij[6],
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
+        self.r: uij[7],
         self.is_training: False,
         })
     return np.mean(res1 - res2 > 0)
@@ -258,19 +254,19 @@ class Model(object):
     res1, att_1, stt_1 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
         self.u: uij[0],
         self.i: uij[1],
-        self.r: uij[6],
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
+        self.r: uij[7],
         self.is_training: False,
         })
     res2, att_2, stt_2 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
         self.u: uij[0],
         self.i: uij[2],
-        self.r: uij[6],
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
+        self.r: uij[7],
         self.is_training: False,
         })
     return res1, res2, att_1, stt_1, att_2, stt_1

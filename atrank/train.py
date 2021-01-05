@@ -30,7 +30,7 @@ tf.app.flags.DEFINE_float('regulation_rate', 0.00005, 'L2 regulation rate')
 
 tf.app.flags.DEFINE_integer('itemid_embedding_size', 64, 'Item id embedding size')
 tf.app.flags.DEFINE_integer('cateid_embedding_size', 64, 'Cate id embedding size')
-tf.app.flags.DEFINE_integer('rev_embedding_size', 300, 'Cate id embedding size')
+tf.app.flags.DEFINE_integer('input_text_emb_size', 300, 'Text input embedding size')
 
 tf.app.flags.DEFINE_boolean('concat_time_emb', True, 'Concat time-embedding instead of Add')
 

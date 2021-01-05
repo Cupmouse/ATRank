@@ -44,12 +44,11 @@ class DataInput:
     # y:正例なら1、負例なら0
     # r:レビュー文
     # sl:履歴の長さ
-    u, i, y, r, sl = [], [], [], [], []
+    u, i, y, sl = [], [], [], [], []
     for t in ts:
       u.append(t[0])
       i.append(t[3])
       y.append(t[4])
-      r.append(t[6][0])
       sl.append(len(t[1]))
     
     # 最大の履歴の長さに合わせて行列を初期化する
@@ -60,8 +59,11 @@ class DataInput:
     # hist_t:行動の時間（hist_i[i]の時間）
     # 行動時間は最後の行動からの相対時間になっている
     hist_t = np.zeros([len(ts), max_sl], np.float32)
+    # r:テキストの埋め込み表現
+    r = np.zeros((len(ts), max_sl, ts[0][6].shape[-1]), dtype=np.float32)
 
     # hist_iとhist_tに内容を書き込み
+    # テキストも
     k = 0
     for t in ts:
       # t[1]は行動の履歴
@@ -69,9 +71,11 @@ class DataInput:
       for l in range(len(t[1])):
         hist_i[k][l] = t[1][l]
         hist_t[k][l] = t[2][l]
+        r[k][l] = t[6][l]
+      
       k += 1
 
-    return self.i, (u, i, y, hist_i, hist_t, sl, r)
+    return self.i, (u, i, y, hist_i, hist_t, sl, None, r)
 
 class DataInputTest:
   """DataInputのテストデータバージョン"""
@@ -111,18 +115,23 @@ class DataInputTest:
       u.append(t[0])
       i.append(t[3][0])
       j.append(t[3][1])
-      r.append(t[5][0])
       sl.append(len(t[1]))
+      r.append(t[5])
+      print(t[5].shape, t[5].dtype)
     max_sl = max(sl)
 
     hist_i = np.zeros([len(ts), max_sl], np.int64)
     hist_t = np.zeros([len(ts), max_sl], np.float32)
+    r = np.zeros((len(ts), max_sl, ts[0][5].shape[-1]), dtype=np.float32)
 
     k = 0
     for t in ts:
       for l in range(len(t[1])):
         hist_i[k][l] = t[1][l]
         hist_t[k][l] = t[2][l]
+        r[k][l] = t[5][l]
       k += 1
 
-    return self.i, (u, i, j, hist_i, hist_t, sl, r)
+    texts = np.array(r)
+
+    return self.i, (u, i, j, hist_i, hist_t, sl, None, texts)

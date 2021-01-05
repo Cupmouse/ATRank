@@ -74,5 +74,6 @@ for i, batch in enumerate(unflatten(imagepaths, PREDICTION_BATCH_SIZE)):
 
 embeddings = {filename: outputs[i] for i, filename in enumerate(imagepaths)}
 
+# ファイル名前とその埋め込み表現
 with open('../raw_data/image_embeddings.pkl', 'wb') as f:
   pickle.dump(embeddings, f, pickle.HIGHEST_PROTOCOL)
