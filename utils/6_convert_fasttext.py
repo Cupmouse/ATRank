@@ -4,9 +4,13 @@ import pickle
 import numpy as np
 from gensim.models.wrappers import FastText
 
-with open('../raw_data/reviews.pkl', 'rb') as f:
-  reviews_df = pickle.load(f)
-  reviews_df = reviews_df['reviewText']
+with open('../raw_data/remap.pkl', 'rb') as f:
+  pickle.load(f)
+  pickle.load(f)
+  pickle.load(f)
+  pickle.load(f)
+  pickle.load(f)
+  texts = pickle.load(f)
 
 fasttext = FastText.load_fasttext_format('../raw_data/cc.en.300.bin')
 
@@ -22,9 +26,9 @@ def sec2vec(sentence):
   return np.mean(words, axis=0)
 
 # レビュー文をベクトル化
-texts = np.ndarray((len(reviews_df), 300))
-for i, sent in enumerate(reviews_df):
-  texts[i] = sec2vec(sent)
+r = np.ndarray((len(texts), 300))
+for i, sent in enumerate(texts):
+  r[i] = sec2vec(sent)
 
-with open('../raw_data/texts.pkl', 'wb') as f:
-  pickle.dump(texts, f, pickle.HIGHEST_PROTOCOL)
+with open('../raw_data/text_embeddings.pkl', 'wb') as f:
+  pickle.dump(r, f, pickle.HIGHEST_PROTOCOL)

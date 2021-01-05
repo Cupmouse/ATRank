@@ -5,31 +5,16 @@ import numpy as np
 
 random.seed(1234)
 
-# 画像埋め込み表現の読み込み
-with open('../raw_data/image_embeddings.pkl', 'rb') as f:
-  image_embeddings = pickle.load(f)
-# テキスト表現の読み込み
-with open('../raw_data/texts.pkl', 'rb') as f:
-  texts = pickle.load(f)
 # データセットの読み込みと利用する要素の選択
 with open('../raw_data/reviews.pkl', 'rb') as f:
   reviews_df = pickle.load(f)
   reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime', 'reviewText']]
-for i in range(len(reviews_df)):
-  reviews_df.reviewText.iat[i] = texts[i]
-texts = None
 with open('../raw_data/meta.pkl', 'rb') as f:
   meta_df = pickle.load(f)
   meta_df = meta_df[['asin', 'categories', 'imUrl']]
 meta_df['categories'] = meta_df['categories'].map(lambda x: x[-1][-1])
 # URLを画像埋め込み表現を取得するためのキーへ変換する
-def url_to_key(url):
-  if isinstance(url, str):
-    key = os.path.basename(url)
-    if key in image_embeddings:
-      return key
-  return 'not_available'
-meta_df['imUrl'] = meta_df['imUrl'].map(url_to_key)
+meta_df['imUrl'] = meta_df['imUrl'].map(lambda url: os.path.basename(url) if isinstance(url, str) else 'not_available')
 
 def build_map(df, col_name):
   """キーをユニークなIDに変換する。そのキーとそのIDをマッピングする辞書との逆処理の配列を返す"""
@@ -55,13 +40,14 @@ meta_df = meta_df.reset_index(drop=True)
 reviews_df['asin'] = reviews_df['asin'].map(lambda x: asin_map[x])
 reviews_df = reviews_df.sort_values(['reviewerID', 'unixReviewTime'])
 reviews_df = reviews_df.reset_index(drop=True)
-reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime', 'reviewText']]
+texts = np.array(reviews_df['reviewText'], dtype=object)
+reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
 
 # ASINの並び順に商品のカテゴリだけをとってきて配列にする
 cate_list = [meta_df['categories'][i] for i in range(len(asin_map))]
 cate_list = np.array(cate_list, dtype=np.int32)
 
-# 同じく画像の配列
+# 商品の画像のID
 img_list = np.array(meta_df['imUrl'], dtype=np.int32)
 
 # 書き出し
@@ -72,3 +58,4 @@ with open('../raw_data/remap.pkl', 'wb') as f:
               f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((asin_key, cate_key, revi_key), f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((img_list, img_key), f, pickle.HIGHEST_PROTOCOL)
+  pickle.dump(texts, f, pickle.HIGHEST_PROTOCOL)
