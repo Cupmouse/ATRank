@@ -8,7 +8,7 @@ import tensorflow.compat.v1 as tf
 class Model(object):
   """モデルのクラスを定義"""
 
-  def __init__(self, config, cate_list):
+  def __init__(self, config, cate_list, img_list, images, texts):
     """config：設定、cate_list：商品のカテゴリ（ASINのID順）"""
     self.config = config
 
@@ -18,7 +18,7 @@ class Model(object):
 
     # Building network
     self.init_placeholders()
-    self.build_model(cate_list)
+    self.build_model(cate_list, img_list, images, texts)
     self.init_optimizer()
 
 
@@ -58,7 +58,7 @@ class Model(object):
     self.is_training = tf.placeholder(tf.bool, [])
 
 
-  def build_model(self, cate_list):
+  def build_model(self, cate_list, img_list, images, texts):
     """モデルの構築"""
 
     # 変数の定義
@@ -79,6 +79,12 @@ class Model(object):
         [self.config['cate_count'], self.config['cateid_embedding_size']])
     # 各商品のIDとカテゴリIDのマップ（リスト） [|I|]
     cate_list = tf.convert_to_tensor(cate_list, dtype=tf.int64)
+    # 商品のIDと画像のIDのマップ（リスト） [|I|]
+    img_list = tf.constant(img_list, dtype=tf.int64)
+    # 画像の埋め込み表現 [|I_im|, d_im]
+    images = tf.constant(images, dtype=tf.float32)
+    # テキストの埋め込み表現 [|I|, d_r]
+    texts = tf.constant(texts, dtype=tf.float32)
 
     # アイテム埋め込みとカテゴリ埋め込みと時間の埋め込みを結合、それをDenseで写像する
     # 論文：p3左のu_ij=h_emb
@@ -95,7 +101,8 @@ class Model(object):
     h_emb = tf.concat([
         tf.nn.embedding_lookup(item_emb_w, self.hist_i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)),
-        self.r,
+        tf.nn.embedding_lookup(images, tf.gather(img_list, self.hist_i)),
+        tf.nn.embedding_lookup(texts, self.hist_i)
         ], 2)
 
     if self.config['concat_time_emb'] == True:
@@ -212,7 +219,6 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
-        self.r: uij[7],
         self.lr: l,
         self.is_training: True,
         }
@@ -238,7 +244,6 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
-        self.r: uij[7],
         self.is_training: False,
         })
     res2 = sess.run(self.eval_logits, feed_dict={
@@ -247,7 +252,6 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
-        self.r: uij[7],
         self.is_training: False,
         })
     return np.mean(res1 - res2 > 0)
@@ -260,7 +264,6 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
-        self.r: uij[7],
         self.is_training: False,
         })
     res2, att_2, stt_2 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
@@ -269,7 +272,6 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
-        self.r: uij[7],
         self.is_training: False,
         })
     return res1, res2, att_1, stt_1, att_2, stt_1

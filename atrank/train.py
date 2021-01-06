@@ -30,6 +30,7 @@ tf.app.flags.DEFINE_float('regulation_rate', 0.00005, 'L2 regulation rate')
 
 tf.app.flags.DEFINE_integer('itemid_embedding_size', 64, 'Item id embedding size')
 tf.app.flags.DEFINE_integer('cateid_embedding_size', 64, 'Cate id embedding size')
+tf.app.flags.DEFINE_integer('input_image_emb_size', 64, 'Image input embedding size')
 tf.app.flags.DEFINE_integer('input_text_emb_size', 300, 'Text input embedding size')
 
 tf.app.flags.DEFINE_boolean('concat_time_emb', True, 'Concat time-embedding instead of Add')
@@ -55,11 +56,11 @@ tf.app.flags.DEFINE_float('per_process_gpu_memory_fraction', 0.0, 'Gpu memory us
 
 FLAGS = tf.app.flags.FLAGS
 
-def create_model(sess, config, cate_list):
+def create_model(sess, config, cate_list, img_list, images, texts):
   """モデルを読み込む"""
 
   print(json.dumps(config, indent=4), flush=True)
-  model = Model(config, cate_list)
+  model = Model(config, cate_list, img_list, images, texts)
 
   print('All global variables:')
   for v in tf.global_variables():
@@ -114,6 +115,8 @@ def train():
     test_set = pickle.load(f)
     cate_list = pickle.load(f)
     user_count, item_count, cate_count = pickle.load(f)
+    img_list, images = pickle.load(f)
+    texts = pickle.load(f)
 
   # Config GPU options
   if FLAGS.per_process_gpu_memory_fraction == 0.0:
@@ -140,7 +143,7 @@ def train():
   with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
 
     # Create a new model or reload existing checkpoint
-    model = create_model(sess, config, cate_list)
+    model = create_model(sess, config, cate_list, img_list, images, texts)
     print('Init finish.\tCost time: %.2fs' % (time.time()-start_time),
           flush=True)
 

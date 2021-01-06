@@ -83,9 +83,7 @@ with open('../raw_data/image_embeddings.pkl', 'rb') as f:
 # 同じ画像は訓練データに複数回現れるので、ユニークなものだけを集める
 img_train_mask = np.zeros(len(image_embeddings), dtype=np.bool)
 hist_i = list(itertools.chain.from_iterable([ts[1] for ts in train_set]))
-print(len(hist_i))
 hist_img = img_list[hist_i]
-print(hist_img)
 img_train_mask[hist_img] = True
 # 訓練データにあって存在する埋め込みだけをとってくる
 masking = np.logical_and(img_train_mask, np.logical_not(img_missing_mask))

@@ -22,11 +22,11 @@ def sec2vec(sentence):
   words = [fasttext[word] for word in words if word in fasttext]
   # 文のベクトルを平均で算出
   if len(words) == 0:
-    return np.zeros((300,))
+    return np.zeros((300,), dtype=np.float32)
   return np.mean(words, axis=0)
 
 # レビュー文をベクトル化
-r = np.ndarray((len(texts), 300))
+r = np.ndarray((len(texts), 300), dtype=np.float32)
 for i, sent in enumerate(texts):
   r[i] = sec2vec(sent)
 
