@@ -56,11 +56,11 @@ tf.app.flags.DEFINE_float('per_process_gpu_memory_fraction', 0.0, 'Gpu memory us
 
 FLAGS = tf.app.flags.FLAGS
 
-def create_model(sess, config, cate_list, img_list, images, texts):
+def create_model(sess, config, cate_list):
   """モデルを読み込む"""
 
   print(json.dumps(config, indent=4), flush=True)
-  model = Model(config, cate_list, img_list, images, texts)
+  model = Model(config, cate_list)
 
   print('All global variables:')
   for v in tf.global_variables():
@@ -82,11 +82,11 @@ def create_model(sess, config, cate_list, img_list, images, texts):
 
   return model
 
-def _eval(sess, test_set, model):
+def _eval(sess, test_set, model, imgs, img_list, texts):
   """評価を行う"""
 
   auc_sum = 0.0
-  for _, uij in DataInputTest(test_set, FLAGS.test_batch_size):
+  for _, uij in DataInputTest(test_set, FLAGS.test_batch_size, imgs, img_list, texts):
     auc_sum += model.eval(sess, uij) * len(uij[0])
   test_auc = auc_sum / len(test_set)
 
@@ -143,12 +143,12 @@ def train():
   with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
 
     # Create a new model or reload existing checkpoint
-    model = create_model(sess, config, cate_list, img_list, images, texts)
+    model = create_model(sess, config, cate_list)
     print('Init finish.\tCost time: %.2fs' % (time.time()-start_time),
           flush=True)
 
     # Eval init AUC
-    print('Init AUC: %.4f' % _eval(sess, test_set, model))
+    print('Init AUC: %.4f' % _eval(sess, test_set, model, images, img_list, texts))
 
     # Start training
     lr = FLAGS.learning_rate
@@ -162,7 +162,7 @@ def train():
 
       random.shuffle(train_set)
 
-      for _, uij in DataInput(train_set, FLAGS.train_batch_size):
+      for _, uij in DataInput(train_set, FLAGS.train_batch_size, images, img_list, texts):
         # バッチループ
 
         add_summary = bool(model.global_step.eval() % FLAGS.display_freq == 0)
@@ -170,7 +170,7 @@ def train():
         avg_loss += step_loss
 
         if model.global_step.eval() % FLAGS.eval_freq == 0:
-          test_auc = _eval(sess, test_set, model)
+          test_auc = _eval(sess, test_set, model, images, img_list, texts)
           print('Epoch %d Global_step %d\tTrain_loss: %.4f\tEval_AUC: %.4f' %
                 (model.global_epoch_step.eval(), model.global_step.eval(),
                  avg_loss / FLAGS.eval_freq, test_auc),

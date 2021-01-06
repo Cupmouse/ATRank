@@ -8,7 +8,7 @@ import tensorflow.compat.v1 as tf
 class Model(object):
   """モデルのクラスを定義"""
 
-  def __init__(self, config, cate_list, img_list, images, texts):
+  def __init__(self, config, cate_list):
     """config：設定、cate_list：商品のカテゴリ（ASINのID順）"""
     self.config = config
 
@@ -18,7 +18,7 @@ class Model(object):
 
     # Building network
     self.init_placeholders()
-    self.build_model(cate_list, img_list, images, texts)
+    self.build_model(cate_list)
     self.init_optimizer()
 
 
@@ -43,7 +43,8 @@ class Model(object):
     # [B, T] user's history item purchase time
     self.hist_t = tf.placeholder(tf.int32, [None, None])
 
-    # [B, T, d_r] review text
+    self.im = tf.placeholder(tf.float32, [None, None, self.config['input_image_emb_size']])
+
     self.r = tf.placeholder(tf.float32, [None, None, self.config['input_text_emb_size']])
 
     # [B] valid length of `hist_i`
@@ -58,7 +59,7 @@ class Model(object):
     self.is_training = tf.placeholder(tf.bool, [])
 
 
-  def build_model(self, cate_list, img_list, images, texts):
+  def build_model(self, cate_list):
     """モデルの構築"""
 
     # 変数の定義
@@ -78,13 +79,7 @@ class Model(object):
         "cate_emb_w",
         [self.config['cate_count'], self.config['cateid_embedding_size']])
     # 各商品のIDとカテゴリIDのマップ（リスト） [|I|]
-    cate_list = tf.convert_to_tensor(cate_list, dtype=tf.int64)
-    # 商品のIDと画像のIDのマップ（リスト） [|I|]
-    img_list = tf.constant(img_list, dtype=tf.int64)
-    # 画像の埋め込み表現 [|I_im|, d_im]
-    images = tf.constant(images, dtype=tf.float32)
-    # テキストの埋め込み表現 [|I|, d_r]
-    texts = tf.constant(texts, dtype=tf.float32)
+    cate_list = tf.convert_to_tensor(cate_list, dtype=tf.int32)
 
     # アイテム埋め込みとカテゴリ埋め込みと時間の埋め込みを結合、それをDenseで写像する
     # 論文：p3左のu_ij=h_emb
@@ -101,8 +96,8 @@ class Model(object):
     h_emb = tf.concat([
         tf.nn.embedding_lookup(item_emb_w, self.hist_i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)),
-        tf.nn.embedding_lookup(images, tf.gather(img_list, self.hist_i)),
-        tf.nn.embedding_lookup(texts, self.hist_i)
+        self.im,
+        self.r,
         ], 2)
 
     if self.config['concat_time_emb'] == True:
@@ -211,7 +206,7 @@ class Model(object):
   def train(self, sess, uij, l, add_summary=False):
     """行動とラベルを入力して学習する"""
 
-    # uij = (u, i, j, hist_i, hist_t, sl, r)
+    # uij = (u, i, j, hist_i, hist_t, sl, im, r)
     input_feed = {
         self.u: uij[0],
         self.i: uij[1],
@@ -219,6 +214,8 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
+        self.im: uij[6],
+        self.r: uij[7],
         self.lr: l,
         self.is_training: True,
         }
@@ -244,6 +241,8 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
+        self.im: uij[6],
+        self.r: uij[7],
         self.is_training: False,
         })
     res2 = sess.run(self.eval_logits, feed_dict={
@@ -252,6 +251,8 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
+        self.im: uij[6],
+        self.r: uij[7],
         self.is_training: False,
         })
     return np.mean(res1 - res2 > 0)
@@ -264,6 +265,8 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
+        self.im: uij[6],
+        self.r: uij[7],
         self.is_training: False,
         })
     res2, att_2, stt_2 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
@@ -272,6 +275,8 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
+        self.im: uij[6],
+        self.r: uij[7],
         self.is_training: False,
         })
     return res1, res2, att_1, stt_1, att_2, stt_1

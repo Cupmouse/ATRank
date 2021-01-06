@@ -5,13 +5,16 @@ class DataInput:
   整形済み学習・テストデータから指定されたバッチを生成
   Iterable & Iterator
   """
-  def __init__(self, data, batch_size):
+  def __init__(self, data, batch_size, imgs, img_list, texts):
     """
     data：学習またはテストデータ
     batch_size：バッチサイズ
     """
     self.batch_size = batch_size
     self.data = data
+    self.imgs = imgs
+    self.img_list = img_list
+    self.texts = texts
     # エポック数の計算
     self.epoch_size = len(self.data) // self.batch_size
     if self.epoch_size * self.batch_size < len(self.data):
@@ -54,10 +57,12 @@ class DataInput:
     max_sl = max(sl)
     
     # hist_i:行動履歴
-    hist_i = np.zeros([len(ts), max_sl], np.int64)
+    hist_i = np.zeros([len(ts), max_sl], np.int32)
     # hist_t:行動の時間（hist_i[i]の時間）
     # 行動時間は最後の行動からの相対時間になっている
-    hist_t = np.zeros([len(ts), max_sl], np.float32)
+    hist_t = np.zeros([len(ts), max_sl], np.int32)
+    im = np.zeros((len(ts), max_sl, self.imgs.shape[-1]), dtype=np.float32)
+    r = np.zeros((len(ts), max_sl, self.texts.shape[-1]), dtype=np.float32)
 
     # hist_iとhist_tに内容を書き込み
     k = 0
@@ -67,18 +72,23 @@ class DataInput:
       for l in range(len(t[1])):
         hist_i[k][l] = t[1][l]
         hist_t[k][l] = t[2][l]
+        im[k][l] = self.imgs[self.img_list[t[1][l]]]
+        r[k][l] = self.texts[t[1][l]]
       
       k += 1
 
-    return self.i, (u, i, y, hist_i, hist_t, sl)
+    return self.i, (u, i, y, hist_i, hist_t, sl, im, r)
 
 class DataInputTest:
   """DataInputのテストデータバージョン"""
-  def __init__(self, data, batch_size):
+  def __init__(self, data, batch_size, imgs, img_list, texts):
 
     # epoch_sizeを決定
     self.batch_size = batch_size
     self.data = data
+    self.imgs = imgs
+    self.img_list = img_list
+    self.texts = texts
     self.epoch_size = len(self.data) // self.batch_size
     if self.epoch_size * self.batch_size < len(self.data):
       self.epoch_size += 1
@@ -113,14 +123,18 @@ class DataInputTest:
     max_sl = max(sl)
     
     #hist_i、hist_tの形を入力長で固定させる
-    hist_i = np.zeros([len(ts), max_sl], np.int64)
-    hist_t = np.zeros([len(ts), max_sl], np.float32)
+    hist_i = np.zeros([len(ts), max_sl], np.int32)
+    hist_t = np.zeros([len(ts), max_sl], np.int32)
+    im = np.zeros((len(ts), max_sl, self.imgs.shape[-1]), dtype=np.float32)
+    r = np.zeros((len(ts), max_sl, self.texts.shape[-1]), dtype=np.float32)
 
     k = 0
     for t in ts:
       for l in range(len(t[1])):
         hist_i[k][l] = t[1][l]
         hist_t[k][l] = t[2][l]
+        im[k][l] = self.imgs[self.img_list[t[1][l]]]
+        r[k][l] = self.texts[t[1][l]]
       k += 1
 
-    return self.i, (u, i, j, hist_i, hist_t, sl)
+    return self.i, (u, i, j, hist_i, hist_t, sl, im, r)
