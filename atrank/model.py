@@ -406,26 +406,26 @@ def multihead_attention(queries,
 
     # ヘッドで分割
     # Split and concat
-    Q_ = tf.concat(tf.split(Q, num_heads, axis=2), axis=0)  # (h*N, T_q, C/h)
-    K_ = tf.concat(tf.split(K, num_heads, axis=2), axis=0)  # (h*N, T_k, C/h)
-    V_ = tf.concat(tf.split(V, num_heads, axis=2), axis=0)  # (h*N, T_k, C/h)
+    # Q_ = tf.concat(tf.split(Q, num_heads, axis=2), axis=0)  # (h*N, T_q, C/h)
+    # K_ = tf.concat(tf.split(K, num_heads, axis=2), axis=0)  # (h*N, T_k, C/h)
+    # V_ = tf.concat(tf.split(V, num_heads, axis=2), axis=0)  # (h*N, T_k, C/h)
 
     # アテンションスコアの算出（QK^T）
     # Multiplication
     # query-key score matrix
     # each big score matrix is then split into h score matrix with same size
     # w.r.t. different part of the feature
-    outputs = tf.matmul(Q_, tf.transpose(K_, [0, 2, 1]))  # (h*N, T_q, T_k)
+    outputs = tf.matmul(Q, tf.transpose(K, [0, 2, 1]))  # (h*N, T_q, T_k)
 
     # sqrt(C/h)で割る
     # Scale
-    outputs = outputs / (K_.get_shape().as_list()[-1] ** 0.5)
+    outputs = outputs / (K.get_shape().as_list()[-1] ** 0.5)
 
     # Key Masking
     # keysは可変の長さを持つ(keys_lengthで定義)、値のある要素だけを示すマスクを生成する
     key_masks = tf.sequence_mask(keys_length, tf.shape(keys)[1])   # (N, T_k)
     # ヘッドの数だけ複製する
-    key_masks = tf.tile(key_masks, [num_heads, 1])  # (h*N, T_k)
+    # key_masks = tf.tile(key_masks, [num_heads, 1])  # (h*N, T_k)
     # クエリの数だけマスクを複製
     key_masks = tf.tile(tf.expand_dims(key_masks, 1), [1, tf.shape(queries)[1], 1])  # (h*N, T_q, T_k)
 
@@ -444,7 +444,7 @@ def multihead_attention(queries,
     # keysのマスキングは行ったが、queryのマスキングは行っていないので行う
     # Query Masking
     query_masks = tf.sequence_mask(queries_length, tf.shape(queries)[1], dtype=tf.float32)   # (N, T_q)
-    query_masks = tf.tile(query_masks, [num_heads, 1])  # (h*N, T_q)
+    # query_masks = tf.tile(query_masks, [num_heads, 1])  # (h*N, T_q)
     query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1, 1, tf.shape(keys)[1]])  # (h*N, T_q, T_k)
     outputs *= query_masks  # broadcasting. (h*N, T_q, T_k)
 
@@ -455,10 +455,10 @@ def multihead_attention(queries,
     outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
 
     # Weighted sum
-    outputs = tf.matmul(outputs, V_)  # ( h*N, T_q, C/h)
+    outputs = tf.matmul(outputs, V)  # ( h*N, T_q, C/h)
 
     # Restore shape
-    outputs = tf.concat(tf.split(outputs, num_heads, axis=0), axis=2)  # (N, T_q, C)
+    # outputs = tf.concat(tf.split(outputs, num_heads, axis=0), axis=2)  # (N, T_q, C)
 
     # Residual connection
     outputs += queries
