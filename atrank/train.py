@@ -47,7 +47,7 @@ tf.app.flags.DEFINE_integer('test_batch_size', 128, 'Testing Batch size')
 tf.app.flags.DEFINE_integer('max_epochs', 10, 'Maximum # of training epochs')
 
 tf.app.flags.DEFINE_integer('display_freq', 100, 'Display training status every this iteration')
-tf.app.flags.DEFINE_integer('eval_freq', 1000, 'Display training status every this iteration')
+tf.app.flags.DEFINE_integer('eval_freq', 10000, 'Display training status every this iteration')
 
 # Runtime parameters
 tf.app.flags.DEFINE_string('cuda_visible_devices', '0', 'Choice which GPU to use')
