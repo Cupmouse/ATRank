@@ -2,7 +2,7 @@
 import random
 import pickle
 import numpy as np
-from sklearn import decomposition
+from sklearn import decomposition, preprocessing
 import itertools
 
 random.seed(1234)
@@ -91,15 +91,12 @@ print('number of selected images to train TruncatedSVD: %d' % masking.sum())
 train_img = image_embeddings[masking]
 # 訓練データからtSVD(PCA)を訓練
 image_tsvd = decomposition.TruncatedSVD(n_components=IMG_DIMINISHED_SIZE, random_state=1234)
-train_img = image_tsvd.fit_transform(train_img)
-# 画像が存在しない場合の代わり
-image_placeholder = np.mean(train_img, axis=0)
-# メモリ対策
-train_img = None
+standarize = preprocessing.StandardScaler()
+standarize.fit_transform(image_tsvd.fit_transform(train_img))
 # 次元圧縮
-image_converted = image_tsvd.transform(image_embeddings)
-# 存在しない画像の場合はプレースホルダで置き換え
-image_converted[img_missing_mask] = image_placeholder
+image_converted = standarize.transform(image_tsvd.transform(image_embeddings))
+# 存在しない画像の場合は0で置き換え
+image_converted[img_missing_mask] = 0
 
 # シャフル
 random.shuffle(train_set)

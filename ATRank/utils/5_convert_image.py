@@ -9,7 +9,7 @@ import pickle
 alexnet = models.alexnet(pretrained=True)
 # 分類層の1番目の出力を特徴ベクトルとして利用
 alexnet.classifier = torch.nn.Sequential(*list(alexnet.classifier.children())[:3])
-alexnet.to('cuda')
+#alexnet.to('cuda')
 
 def unflatten(l, batch_size):
   last_i = int(len(l)/batch_size)
@@ -69,7 +69,7 @@ for i, batch in enumerate(unflatten(img_key, PREDICTION_BATCH_SIZE)):
     input_batch = input_batch[:len(batch)]
 
   # 入力テンソルをGPUへ
-  input_batch = input_batch.to('cuda')
+  #input_batch = input_batch.to('cuda')
   
   # パラメーターが変化しないようにAlexNetへ入力
   with torch.no_grad():

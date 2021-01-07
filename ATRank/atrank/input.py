@@ -43,39 +43,28 @@ class DataInput:
 
     # 行列へ入れ込む
     # u:ユーザーID
+    # hi:履歴
+    # ht:履歴の時間
     # i:予測する商品のID(ラベル)
     # y:正例なら1、負例なら0
     # sl:履歴の長さ
-    u, i, y, sl = [], [], [], []
-    for t in ts:
-      u.append(t[0])
-      i.append(t[3])
-      y.append(t[4])
-      sl.append(len(t[1]))
-    
-    # 最大の履歴の長さに合わせて行列を初期化する
+    u, hi, ht, i, y = zip(*ts)
+    sl = [len(h) for h in hi]
     max_sl = max(sl)
     
+    # 最大の履歴の長さに合わせて行列を初期化する
     # hist_i:行動履歴
     hist_i = np.zeros([len(ts), max_sl], np.int32)
     # hist_t:行動の時間（hist_i[i]の時間）
     # 行動時間は最後の行動からの相対時間になっている
     hist_t = np.zeros([len(ts), max_sl], np.int32)
-    im = np.zeros((len(ts), max_sl, self.imgs.shape[-1]), dtype=np.float32)
-    r = np.zeros((len(ts), max_sl, self.texts.shape[-1]), dtype=np.float32)
 
-    # hist_iとhist_tに内容を書き込み
-    k = 0
-    for t in ts:
-      # t[1]は行動の履歴
-      # t[2]は行動の時間の履歴
-      for l in range(len(t[1])):
-        hist_i[k][l] = t[1][l]
-        hist_t[k][l] = t[2][l]
-        im[k][l] = self.imgs[self.img_list[t[1][l]]]
-        r[k][l] = self.texts[t[1][l]]
-      
-      k += 1
+    for j in range(len(ts)):
+      hist_i[j, :len(hi[j])] = hi[j]
+      hist_t[j, :len(ht[j])] = ht[j]
+
+    im = self.imgs[self.img_list[hist_i]]
+    r = self.texts[hist_i]
 
     return self.i, (u, i, y, hist_i, hist_t, sl, im, r)
 
@@ -114,27 +103,20 @@ class DataInputTest:
     # i:正例のラベル(予測する商品のID)
     # j:負例のラベル(予測する商品のID)
     # sl:履歴の長さ
-    u, i, j, sl = [], [], [], []
-    for t in ts:
-      u.append(t[0])
-      i.append(t[3][0])
-      j.append(t[3][1])
-      sl.append(len(t[1]))
+    u, hi, ht, ij = zip(*ts)
+    sl = [len(h) for h in hi]
     max_sl = max(sl)
+    i, j = zip(*ij)
     
     #hist_i、hist_tの形を入力長で固定させる
     hist_i = np.zeros([len(ts), max_sl], np.int32)
     hist_t = np.zeros([len(ts), max_sl], np.int32)
-    im = np.zeros((len(ts), max_sl, self.imgs.shape[-1]), dtype=np.float32)
-    r = np.zeros((len(ts), max_sl, self.texts.shape[-1]), dtype=np.float32)
+    
+    for k in range(len(ts)):
+      hist_i[k, :len(hi[k])] = hi[k]
+      hist_t[k, :len(ht[k])] = ht[k]
 
-    k = 0
-    for t in ts:
-      for l in range(len(t[1])):
-        hist_i[k][l] = t[1][l]
-        hist_t[k][l] = t[2][l]
-        im[k][l] = self.imgs[self.img_list[t[1][l]]]
-        r[k][l] = self.texts[t[1][l]]
-      k += 1
+    im = self.imgs[self.img_list[hist_i]]
+    r = self.texts[hist_i]
 
     return self.i, (u, i, j, hist_i, hist_t, sl, im, r)

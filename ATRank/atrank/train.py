@@ -161,6 +161,7 @@ def train():
       # エポックループ
 
       random.shuffle(train_set)
+      count = 0
 
       for _, uij in DataInput(train_set, FLAGS.train_batch_size, images, img_list, texts):
         # バッチループ
@@ -168,6 +169,9 @@ def train():
         add_summary = bool(model.global_step.eval() % FLAGS.display_freq == 0)
         step_loss = model.train(sess, uij, lr, add_summary)
         avg_loss += step_loss
+        count += 1
+        if count > 15000:
+            break
 
         if model.global_step.eval() % FLAGS.eval_freq == 0:
           test_auc = _eval(sess, test_set, model, images, img_list, texts)
