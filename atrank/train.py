@@ -11,6 +11,7 @@ import tensorflow.compat.v1 as tf
 
 from input import DataInput, DataInputTest
 from model import Model
+from mt_itr import MultiThreadedIterator
 
 # ランダムシードの設定
 
@@ -86,8 +87,9 @@ def _eval(sess, test_set, model, imgs, img_list, texts):
   """評価を行う"""
 
   auc_sum = 0.0
-  for _, uij in DataInputTest(test_set, FLAGS.test_batch_size, imgs, img_list, texts):
-    auc_sum += model.eval(sess, uij) * len(uij[0])
+  with MultiThreadedIterator(DataInputTest(test_set, FLAGS.test_batch_size, imgs, img_list, texts)) as itb:
+    for _, uij in itb:
+      auc_sum += model.eval(sess, uij) * len(uij[0])
   test_auc = auc_sum / len(test_set)
 
   model.eval_writer.add_summary(
@@ -162,27 +164,29 @@ def train():
 
       random.shuffle(train_set)
 
-      for _, uij in DataInput(train_set, FLAGS.train_batch_size, images, img_list, texts):
-        # バッチループ
+      with MultiThreadedIterator(DataInput(train_set, FLAGS.train_batch_size, images, img_list, texts)) as itb:
 
-        add_summary = bool(model.global_step.eval() % FLAGS.display_freq == 0)
-        step_loss = model.train(sess, uij, lr, add_summary)
-        avg_loss += step_loss
+        for _, uij in itb:
+          # バッチループ
 
-        if model.global_step.eval() % FLAGS.eval_freq == 0:
-          test_auc = _eval(sess, test_set, model, images, img_list, texts)
-          print('Epoch %d Global_step %d\tTrain_loss: %.4f\tEval_AUC: %.4f' %
-                (model.global_epoch_step.eval(), model.global_step.eval(),
-                 avg_loss / FLAGS.eval_freq, test_auc),
-                flush=True)
-          avg_loss = 0.0
+          add_summary = bool(model.global_step.eval() % FLAGS.display_freq == 0)
+          step_loss = model.train(sess, uij, lr, add_summary)
+          avg_loss += step_loss
 
-          if test_auc > 0.88 and test_auc > best_auc:
-            best_auc = test_auc
-            model.save(sess)
+          if model.global_step.eval() % FLAGS.eval_freq == 0:
+            test_auc = _eval(sess, test_set, model, images, img_list, texts)
+            print('Epoch %d Global_step %d\tTrain_loss: %.4f\tEval_AUC: %.4f' %
+                  (model.global_epoch_step.eval(), model.global_step.eval(),
+                  avg_loss / FLAGS.eval_freq, test_auc),
+                  flush=True)
+            avg_loss = 0.0
 
-        if model.global_step.eval() == 336000:
-          lr = 0.1
+            if test_auc > 0.88 and test_auc > best_auc:
+              best_auc = test_auc
+              model.save(sess)
+
+          if model.global_step.eval() == 336000:
+            lr = 0.1
 
       print('Epoch %d DONE\tCost time: %.2f' %
             (model.global_epoch_step.eval(), time.time()-start_time),
