@@ -51,6 +51,8 @@ class DataInput:
     u, hi, ht, i, y = zip(*ts)
     sl = [len(h) for h in hi]
     max_sl = max(sl)
+    # iは配列のインデックスに使われるのでリストでなければならない
+    i = np.array(i, dtype=np.int32)
     
     # 最大の履歴の長さに合わせて行列を初期化する
     # hist_i:行動履歴
@@ -65,8 +67,10 @@ class DataInput:
 
     im = self.imgs[self.img_list[hist_i]]
     r = self.texts[hist_i]
+    im_i = self.imgs[self.img_list[i]]
+    r_i = self.texts[i]
 
-    return self.i, (u, i, y, hist_i, hist_t, sl, im, r)
+    return self.i, (u, i, y, hist_i, hist_t, sl, im, r, im_i, r_i)
 
 class DataInputTest:
   """DataInputのテストデータバージョン"""
@@ -107,6 +111,7 @@ class DataInputTest:
     sl = [len(h) for h in hi]
     max_sl = max(sl)
     i, j = zip(*ij)
+    i, j = np.array(i, dtype=np.int32), np.array(j, dtype=np.int32)
     
     #hist_i、hist_tの形を入力長で固定させる
     hist_i = np.zeros([len(ts), max_sl], np.int32)
@@ -118,5 +123,9 @@ class DataInputTest:
 
     im = self.imgs[self.img_list[hist_i]]
     r = self.texts[hist_i]
+    im_i = self.imgs[self.img_list[i]]
+    r_i = self.texts[i]
+    im_j = self.imgs[self.img_list[j]]
+    r_j = self.texts[j]
 
-    return self.i, (u, i, j, hist_i, hist_t, sl, im, r)
+    return self.i, (u, i, j, hist_i, hist_t, sl, im, r, im_i, r_i, im_j, r_j)

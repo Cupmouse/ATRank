@@ -23,7 +23,7 @@ tf.set_random_seed(1234)
 
 # pylint: disable=line-too-long
 # Network parameters
-tf.app.flags.DEFINE_integer('hidden_units', 128, 'Number of hidden units in each layer')
+tf.app.flags.DEFINE_integer('hidden_units', 492, 'Number of hidden units in each layer')
 tf.app.flags.DEFINE_integer('num_blocks', 1, 'Number of blocks in each attention')
 tf.app.flags.DEFINE_integer('num_heads', 8, 'Number of heads in each attention')
 tf.app.flags.DEFINE_float('dropout', 0.0, 'Dropout probability(0.0: no dropout)')

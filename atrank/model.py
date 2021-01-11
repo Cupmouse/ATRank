@@ -43,9 +43,17 @@ class Model(object):
     # [B, T] user's history item purchase time
     self.hist_t = tf.placeholder(tf.int32, [None, None])
 
+    # [B, T, d_i] ユーザーの履歴の商品の画像の埋め込み表現
     self.im = tf.placeholder(tf.float32, [None, None, self.config['input_image_emb_size']])
 
+    # [B, T, d_r] ユーザーの履歴のレビュー文章の埋め込み表現
     self.r = tf.placeholder(tf.float32, [None, None, self.config['input_text_emb_size']])
+
+    # [B, d_i] ユーザーのデコーダーに入力する商品の画像の埋め込み表現
+    self.im_i = tf.placeholder(tf.float32, [None, self.config['input_image_emb_size']])
+
+    # [B, d_r] ユーザーのデコーダーに入力する商品の文章の埋め込み表現
+    self.r_i = tf.placeholder(tf.float32, [None, self.config['input_text_emb_size']])
 
     # [B] valid length of `hist_i`
     self.sl = tf.placeholder(tf.int32, [None,])
@@ -87,6 +95,8 @@ class Model(object):
     i_emb = tf.concat([
         tf.nn.embedding_lookup(item_emb_w, self.i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.i)),
+        self.im_i,
+        self.r_i,
         ], 1)
     # 予測すべきアイテムの重み [B]
     i_b = tf.gather(item_b, self.i)
@@ -216,6 +226,8 @@ class Model(object):
         self.sl: uij[5],
         self.im: uij[6],
         self.r: uij[7],
+        self.im_i: uij[8],
+        self.r_i: uij[9],
         self.lr: l,
         self.is_training: True,
         }
@@ -243,6 +255,8 @@ class Model(object):
         self.sl: uij[5],
         self.im: uij[6],
         self.r: uij[7],
+        self.im_i: uij[8],
+        self.r_i: uij[9],
         self.is_training: False,
         })
     res2 = sess.run(self.eval_logits, feed_dict={
@@ -253,6 +267,8 @@ class Model(object):
         self.sl: uij[5],
         self.im: uij[6],
         self.r: uij[7],
+        self.im_i: uij[10],
+        self.r_i: uij[11],
         self.is_training: False,
         })
     return np.mean(res1 - res2 > 0)
@@ -267,6 +283,8 @@ class Model(object):
         self.sl: uij[5],
         self.im: uij[6],
         self.r: uij[7],
+        self.im_i: uij[8],
+        self.r_i: uij[9],
         self.is_training: False,
         })
     res2, att_2, stt_2 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
@@ -277,6 +295,8 @@ class Model(object):
         self.sl: uij[5],
         self.im: uij[6],
         self.r: uij[7],
+        self.im_i: uij[10],
+        self.r_i: uij[11],
         self.is_training: False,
         })
     return res1, res2, att_1, stt_1, att_2, stt_1
