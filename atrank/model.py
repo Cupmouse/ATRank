@@ -43,8 +43,10 @@ class Model(object):
     # [B, T] user's history item purchase time
     self.hist_t = tf.placeholder(tf.int32, [None, None])
 
+    # [B, T, d_i] ユーザーの履歴の商品の画像の埋め込み表現
     self.im = tf.placeholder(tf.float32, [None, None, self.config['input_image_emb_size']])
 
+    # [B, T, d_r] ユーザーの履歴のレビュー文章の埋め込み表現
     self.r = tf.placeholder(tf.float32, [None, None, self.config['input_text_emb_size']])
 
     # [B] valid length of `hist_i`
@@ -411,6 +413,115 @@ def multihead_attention(queries,
     # V_ = tf.concat(tf.split(V, num_heads, axis=2), axis=0)  # (h*N, T_k, C/h)
 
     # アテンションスコアの算出（QK^T）
+    # Multiplication
+    # query-key score matrix
+    # each big score matrix is then split into h score matrix with same size
+    # w.r.t. different part of the feature
+    outputs = tf.matmul(Q, tf.transpose(K, [0, 2, 1]))  # (h*N, T_q, T_k)
+
+    # sqrt(C/h)で割る
+    # Scale
+    outputs = outputs / (K.get_shape().as_list()[-1] ** 0.5)
+
+    # Key Masking
+    # keysは可変の長さを持つ(keys_lengthで定義)、値のある要素だけを示すマスクを生成する
+    key_masks = tf.sequence_mask(keys_length, tf.shape(keys)[1])   # (N, T_k)
+    # ヘッドの数だけ複製する
+    # key_masks = tf.tile(key_masks, [num_heads, 1])  # (h*N, T_k)
+    # クエリの数だけマスクを複製
+    key_masks = tf.tile(tf.expand_dims(key_masks, 1), [1, tf.shape(queries)[1], 1])  # (h*N, T_q, T_k)
+
+    # -2^32+1は無限大として考える、outputsと同じ形を持つすべての要素が無限大の行列paddingsを作る
+    paddings = tf.ones_like(outputs) * (-2 ** 32 + 1)
+    # outputsにマスクを適用する、key_masksがTrueの要素はoutputsで、Falseはpaddingsで塗りつぶす
+    outputs = tf.where(key_masks, outputs, paddings)  # (h*N, T_q, T_k)
+
+    # 文章のトランスフォーマーとは違い、予測に必要な以外の将来の行動をマスクする必要はないので実装していない
+    # Causality = Future blinding: No use, removed
+
+    # 最後の次元、T_kのaxisでsoftmaxが実行される
+    # Activation
+    outputs = tf.nn.softmax(outputs)  # (h*N, T_q, T_k)
+
+    # keysのマスキングは行ったが、queryのマスキングは行っていないので行う
+    # Query Masking
+    query_masks = tf.sequence_mask(queries_length, tf.shape(queries)[1], dtype=tf.float32)   # (N, T_q)
+    # query_masks = tf.tile(query_masks, [num_heads, 1])  # (h*N, T_q)
+    query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1, 1, tf.shape(keys)[1]])  # (h*N, T_q, T_k)
+    outputs *= query_masks  # broadcasting. (h*N, T_q, T_k)
+
+    # Attention vector
+    att_vec = outputs
+
+    # Dropouts
+    outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
+
+    # Weighted sum
+    outputs = tf.matmul(outputs, V)  # ( h*N, T_q, C/h)
+
+    # Restore shape
+    # outputs = tf.concat(tf.split(outputs, num_heads, axis=0), axis=2)  # (N, T_q, C)
+
+    # Residual connection
+    outputs += queries
+
+    # Normalize
+    outputs = normalize(outputs)  # (N, T_q, C)
+
+  return outputs, att_vec
+
+
+def multimodal_aware_multihead_attention(queries,
+            queries_length,
+            keys,
+            keys_length,
+            num_units=None,
+            num_heads=8,
+            dropout_rate=0,
+            is_training=True,
+            scope="multihead_attention",
+            reuse=None):
+  '''Applies multihead attention.
+
+  Args:
+    queries: A 3d tensor with shape of [N, T_q, C_q].
+    queries_length: A 1d tensor with shape of [N].
+    keys: A 3d tensor with shape of [N, T_k, C_k].
+    keys_length:  A 1d tensor with shape of [N].
+    num_units: A scalar. Attention size.
+    dropout_rate: A floating point number.
+    is_training: Boolean. Controller of mechanism for dropout.
+    num_heads: An int. Number of heads.
+    scope: Optional scope for `variable_scope`.
+    reuse: Boolean, whether to reuse the weights of a previous layer
+    by the same name.
+
+  Returns
+    A 3d tensor with shape of (N, T_q, C)
+  '''
+  with tf.variable_scope(scope, reuse=reuse):
+    # Set the fall back option for num_units
+    if num_units is None:
+      num_units = queries.get_shape().as_list[-1]
+
+    # queries ----> dense(relu) ----> Q
+    #
+    # keys    --+-> dense(relu) ----> K
+    #           |
+    #           +-> dense(relu) ----> V
+    # Linear projections, C = # dim or column, T_x = # vectors or actions
+    Q = tf.layers.dense(queries, num_units, activation=tf.nn.relu)  # (N, T_q, C)
+    K = tf.layers.dense(keys, num_units, activation=tf.nn.relu)  # (N, T_k, C)
+  
+    # (N, T_k, 1, C)
+    V = tf.expand_dims(keys, axis=2)
+    V = [None]*num_heads
+    for h in range(num_heads):
+      V[h] = tf.layers.dense(keys, num_units, activation=tf.nn.relu)
+    # (N, T_k, h, C)
+    V = tf.concat(V, axis=2)
+    
+    # アテンションスコアの算出（QK）
     # Multiplication
     # query-key score matrix
     # each big score matrix is then split into h score matrix with same size
