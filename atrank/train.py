@@ -25,7 +25,7 @@ tf.set_random_seed(1234)
 # Network parameters
 tf.app.flags.DEFINE_integer('hidden_units', 492, 'Number of hidden units in each layer')
 tf.app.flags.DEFINE_integer('num_blocks', 1, 'Number of blocks in each attention')
-tf.app.flags.DEFINE_integer('num_heads', 8, 'Number of heads in each attention')
+tf.app.flags.DEFINE_integer('num_heads', 12, 'Number of heads in each attention')
 tf.app.flags.DEFINE_float('dropout', 0.0, 'Dropout probability(0.0: no dropout)')
 tf.app.flags.DEFINE_float('regulation_rate', 0.00005, 'L2 regulation rate')
 
@@ -44,7 +44,7 @@ tf.app.flags.DEFINE_float('learning_rate', 1.0, 'Learning rate')
 tf.app.flags.DEFINE_float('max_gradient_norm', 5.0, 'Clip gradients to this norm')
 
 tf.app.flags.DEFINE_integer('train_batch_size', 32, 'Training Batch size')
-tf.app.flags.DEFINE_integer('test_batch_size', 128, 'Testing Batch size')
+tf.app.flags.DEFINE_integer('test_batch_size',  64, 'Testing Batch size')
 tf.app.flags.DEFINE_integer('max_epochs', 10, 'Maximum # of training epochs')
 
 tf.app.flags.DEFINE_integer('display_freq', 100, 'Display training status every this iteration')
