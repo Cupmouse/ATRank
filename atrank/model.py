@@ -43,10 +43,6 @@ class Model(object):
     # [B, T] user's history item purchase time
     self.hist_t = tf.placeholder(tf.int32, [None, None])
 
-    self.im = tf.placeholder(tf.float32, [None, None, self.config['input_image_emb_size']])
-
-    self.r = tf.placeholder(tf.float32, [None, None, self.config['input_text_emb_size']])
-
     # [B] valid length of `hist_i`
     self.sl = tf.placeholder(tf.int32, [None,])
 
@@ -96,8 +92,6 @@ class Model(object):
     h_emb = tf.concat([
         tf.nn.embedding_lookup(item_emb_w, self.hist_i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)),
-        self.im,
-        self.r,
         ], 2)
 
     if self.config['concat_time_emb'] == True:
@@ -214,8 +208,6 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
-        self.im: uij[6],
-        self.r: uij[7],
         self.lr: l,
         self.is_training: True,
         }
@@ -241,8 +233,6 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
-        self.im: uij[6],
-        self.r: uij[7],
         self.is_training: False,
         })
     res2 = sess.run(self.eval_logits, feed_dict={
@@ -251,8 +241,6 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
-        self.im: uij[6],
-        self.r: uij[7],
         self.is_training: False,
         })
     return np.mean(res1 - res2 > 0)
@@ -265,8 +253,6 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
-        self.im: uij[6],
-        self.r: uij[7],
         self.is_training: False,
         })
     res2, att_2, stt_2 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
@@ -275,8 +261,6 @@ class Model(object):
         self.hist_i: uij[3],
         self.hist_t: uij[4],
         self.sl: uij[5],
-        self.im: uij[6],
-        self.r: uij[7],
         self.is_training: False,
         })
     return res1, res2, att_1, stt_1, att_2, stt_1

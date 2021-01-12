@@ -30,8 +30,6 @@ tf.app.flags.DEFINE_float('regulation_rate', 0.00005, 'L2 regulation rate')
 
 tf.app.flags.DEFINE_integer('itemid_embedding_size', 64, 'Item id embedding size')
 tf.app.flags.DEFINE_integer('cateid_embedding_size', 64, 'Cate id embedding size')
-tf.app.flags.DEFINE_integer('input_image_emb_size', 64, 'Image input embedding size')
-tf.app.flags.DEFINE_integer('input_text_emb_size', 300, 'Text input embedding size')
 
 tf.app.flags.DEFINE_boolean('concat_time_emb', True, 'Concat time-embedding instead of Add')
 
@@ -42,7 +40,7 @@ tf.app.flags.DEFINE_string('optimizer', 'sgd', 'Optimizer for training: (adadelt
 tf.app.flags.DEFINE_float('learning_rate', 1.0, 'Learning rate')
 tf.app.flags.DEFINE_float('max_gradient_norm', 5.0, 'Clip gradients to this norm')
 
-tf.app.flags.DEFINE_integer('train_batch_size', 32, 'Training Batch size')
+tf.app.flags.DEFINE_integer('train_batch_size', 64, 'Training Batch size')
 tf.app.flags.DEFINE_integer('test_batch_size', 128, 'Testing Batch size')
 tf.app.flags.DEFINE_integer('max_epochs', 10, 'Maximum # of training epochs')
 
@@ -82,11 +80,11 @@ def create_model(sess, config, cate_list):
 
   return model
 
-def _eval(sess, test_set, model, imgs, img_list, texts):
+def _eval(sess, test_set, model):
   """評価を行う"""
 
   auc_sum = 0.0
-  for _, uij in DataInputTest(test_set, FLAGS.test_batch_size, imgs, img_list, texts):
+  for _, uij in DataInputTest(test_set, FLAGS.test_batch_size):
     auc_sum += model.eval(sess, uij) * len(uij[0])
   test_auc = auc_sum / len(test_set)
 
@@ -115,8 +113,6 @@ def train():
     test_set = pickle.load(f)
     cate_list = pickle.load(f)
     user_count, item_count, cate_count = pickle.load(f)
-    img_list, images = pickle.load(f)
-    texts = pickle.load(f)
 
   # Config GPU options
   if FLAGS.per_process_gpu_memory_fraction == 0.0:
@@ -148,7 +144,7 @@ def train():
           flush=True)
 
     # Eval init AUC
-    print('Init AUC: %.4f' % _eval(sess, test_set, model, images, img_list, texts))
+    print('Init AUC: %.4f' % _eval(sess, test_set, model))
 
     # Start training
     lr = FLAGS.learning_rate
@@ -162,7 +158,7 @@ def train():
 
       random.shuffle(train_set)
 
-      for _, uij in DataInput(train_set, FLAGS.train_batch_size, images, img_list, texts):
+      for _, uij in DataInput(train_set, FLAGS.train_batch_size):
         # バッチループ
 
         add_summary = bool(model.global_step.eval() % FLAGS.display_freq == 0)
@@ -170,7 +166,7 @@ def train():
         avg_loss += step_loss
 
         if model.global_step.eval() % FLAGS.eval_freq == 0:
-          test_auc = _eval(sess, test_set, model, images, img_list, texts)
+          test_auc = _eval(sess, test_set, model)
           print('Epoch %d Global_step %d\tTrain_loss: %.4f\tEval_AUC: %.4f' %
                 (model.global_epoch_step.eval(), model.global_step.eval(),
                  avg_loss / FLAGS.eval_freq, test_auc),

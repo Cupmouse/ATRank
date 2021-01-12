@@ -5,16 +5,13 @@ class DataInput:
   整形済み学習・テストデータから指定されたバッチを生成
   Iterable & Iterator
   """
-  def __init__(self, data, batch_size, imgs, img_list, texts):
+  def __init__(self, data, batch_size):
     """
     data：学習またはテストデータ
     batch_size：バッチサイズ
     """
     self.batch_size = batch_size
     self.data = data
-    self.imgs = imgs
-    self.img_list = img_list
-    self.texts = texts
     # エポック数の計算
     self.epoch_size = len(self.data) // self.batch_size
     if self.epoch_size * self.batch_size < len(self.data):
@@ -63,21 +60,15 @@ class DataInput:
       hist_i[j, :len(hi[j])] = hi[j]
       hist_t[j, :len(ht[j])] = ht[j]
 
-    im = self.imgs[self.img_list[hist_i]]
-    r = self.texts[hist_i]
-
-    return self.i, (u, i, y, hist_i, hist_t, sl, im, r)
+    return self.i, (u, i, y, hist_i, hist_t, sl)
 
 class DataInputTest:
   """DataInputのテストデータバージョン"""
-  def __init__(self, data, batch_size, imgs, img_list, texts):
+  def __init__(self, data, batch_size):
 
     # epoch_sizeを決定
     self.batch_size = batch_size
     self.data = data
-    self.imgs = imgs
-    self.img_list = img_list
-    self.texts = texts
     self.epoch_size = len(self.data) // self.batch_size
     if self.epoch_size * self.batch_size < len(self.data):
       self.epoch_size += 1
@@ -116,7 +107,4 @@ class DataInputTest:
       hist_i[k, :len(hi[k])] = hi[k]
       hist_t[k, :len(ht[k])] = ht[k]
 
-    im = self.imgs[self.img_list[hist_i]]
-    r = self.texts[hist_i]
-
-    return self.i, (u, i, j, hist_i, hist_t, sl, im, r)
+    return self.i, (u, i, j, hist_i, hist_t, sl)
