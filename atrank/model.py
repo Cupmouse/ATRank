@@ -536,8 +536,6 @@ def multimodal_aware_multihead_attention(queries,
     # (N, T_k, C)
     V = tf.einsum('ijkl,ijl->ijk', V, head_selector)
 
-    print(head_selector.get_shape().as_list())
-    
     # アテンションスコアの算出（QK）
     # Multiplication
     # query-key score matrix
@@ -589,8 +587,6 @@ def multimodal_aware_multihead_attention(queries,
 
     # Normalize
     outputs = normalize(outputs)  # (N, T_q, C)
-
-    print(outputs.get_shape().as_list())
 
   return outputs, k_att_vec, h_att_vec
 
