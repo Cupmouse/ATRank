@@ -124,7 +124,7 @@ class Model(object):
     # トランスフォーマー
     # 論文：p4左数式(3)
     # u_emb [B, C]
-    u_emb, self.att, self.stt = attention_net(
+    u_emb, self.att, self.stt, self.hatt = attention_net(
         # uij
         h_emb,
         # ユーザーの履歴の長さ
@@ -317,7 +317,7 @@ def attention_net(enc, sl, dec, num_units, num_heads, num_blocks, dropout_rate, 
           # セルフマルチヘッドアテンション
           ### Multihead Attention
           # enc [B, Tq, C]
-          enc, stt_vec = multihead_attention(queries=enc,
+          enc, stt_vec, hatt_vec = multimodal_aware_multihead_attention(queries=enc,
               queries_length=sl,
               keys=enc,
               keys_length=sl,
@@ -360,7 +360,7 @@ def attention_net(enc, sl, dec, num_units, num_heads, num_blocks, dropout_rate, 
 
     # [B, C]
     dec = tf.reshape(dec, [-1, num_units])
-    return dec, att_vec, stt_vec
+    return dec, att_vec, stt_vec, hatt_vec
 
 
 def multihead_attention(queries,
@@ -504,6 +504,16 @@ def multimodal_aware_multihead_attention(queries,
     if num_units is None:
       num_units = queries.get_shape().as_list[-1]
 
+    # ヘッド選択のための行列
+    Q_h = tf.layers.dense(queries, num_heads, activation=tf.nn.relu) # (N, T_q, h)
+
+    # ヘッドのアテンション
+    h_att_vec = tf.nn.softmax(Q_h)
+
+    # ヘッドのアテンションのドロップアウト
+    # (N, T_q, h)
+    head_selector = tf.layers.dropout(h_att_vec, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
+
     # queries ----> dense(relu) ----> Q
     #
     # keys    --+-> dense(relu) ----> K
@@ -513,20 +523,27 @@ def multimodal_aware_multihead_attention(queries,
     Q = tf.layers.dense(queries, num_units, activation=tf.nn.relu)  # (N, T_q, C)
     K = tf.layers.dense(keys, num_units, activation=tf.nn.relu)  # (N, T_k, C)
   
-    # (N, T_k, 1, C)
-    V = tf.expand_dims(keys, axis=2)
+    # (N, T_k, C, h)
     V = [None]*num_heads
     for h in range(num_heads):
       V[h] = tf.layers.dense(keys, num_units, activation=tf.nn.relu)
-    # (N, T_k, h, C)
-    V = tf.concat(V, axis=2)
+      # (N, T_k, C, 1)
+      V[h] = tf.expand_dims(V[h], axis=-1)
+    # (N, T_k, C, h)
+    V = tf.concat(V, axis=-1)
+
+    # ヘッドの選択
+    # (N, T_k, C)
+    V = tf.einsum('ijkl,ijl->ijk', V, head_selector)
+
+    print(head_selector.get_shape().as_list())
     
     # アテンションスコアの算出（QK）
     # Multiplication
     # query-key score matrix
     # each big score matrix is then split into h score matrix with same size
     # w.r.t. different part of the feature
-    outputs = tf.matmul(Q, tf.transpose(K, [0, 2, 1]))  # (h*N, T_q, T_k)
+    outputs = tf.matmul(Q, tf.transpose(K, [0, 2, 1]))  # (N, T_q, T_k)
 
     # sqrt(C/h)で割る
     # Scale
@@ -536,40 +553,36 @@ def multimodal_aware_multihead_attention(queries,
     # keysは可変の長さを持つ(keys_lengthで定義)、値のある要素だけを示すマスクを生成する
     key_masks = tf.sequence_mask(keys_length, tf.shape(keys)[1])   # (N, T_k)
     # ヘッドの数だけ複製する
-    # key_masks = tf.tile(key_masks, [num_heads, 1])  # (h*N, T_k)
+    # key_masks = tf.tile(key_masks, [num_heads, 1])  # (N, T_k)
     # クエリの数だけマスクを複製
-    key_masks = tf.tile(tf.expand_dims(key_masks, 1), [1, tf.shape(queries)[1], 1])  # (h*N, T_q, T_k)
+    key_masks = tf.tile(tf.expand_dims(key_masks, 1), [1, tf.shape(queries)[1], 1])  # (N, T_q, T_k)
 
     # -2^32+1は無限大として考える、outputsと同じ形を持つすべての要素が無限大の行列paddingsを作る
     paddings = tf.ones_like(outputs) * (-2 ** 32 + 1)
     # outputsにマスクを適用する、key_masksがTrueの要素はoutputsで、Falseはpaddingsで塗りつぶす
-    outputs = tf.where(key_masks, outputs, paddings)  # (h*N, T_q, T_k)
+    outputs = tf.where(key_masks, outputs, paddings)  # (N, T_q, T_k)
 
     # 文章のトランスフォーマーとは違い、予測に必要な以外の将来の行動をマスクする必要はないので実装していない
     # Causality = Future blinding: No use, removed
 
     # 最後の次元、T_kのaxisでsoftmaxが実行される
     # Activation
-    outputs = tf.nn.softmax(outputs)  # (h*N, T_q, T_k)
+    outputs = tf.nn.softmax(outputs)  # (N, T_q, T_k)
 
     # keysのマスキングは行ったが、queryのマスキングは行っていないので行う
     # Query Masking
     query_masks = tf.sequence_mask(queries_length, tf.shape(queries)[1], dtype=tf.float32)   # (N, T_q)
-    # query_masks = tf.tile(query_masks, [num_heads, 1])  # (h*N, T_q)
-    query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1, 1, tf.shape(keys)[1]])  # (h*N, T_q, T_k)
-    outputs *= query_masks  # broadcasting. (h*N, T_q, T_k)
+    query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1, 1, tf.shape(keys)[1]])  # (N, T_q, T_k)
+    outputs *= query_masks  # broadcasting. (N, T_q, T_k)
 
     # Attention vector
-    att_vec = outputs
+    k_att_vec = outputs
 
     # Dropouts
     outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
 
     # Weighted sum
-    outputs = tf.matmul(outputs, V)  # ( h*N, T_q, C/h)
-
-    # Restore shape
-    # outputs = tf.concat(tf.split(outputs, num_heads, axis=0), axis=2)  # (N, T_q, C)
+    outputs = tf.matmul(outputs, V)  # ( N, T_q, C)
 
     # Residual connection
     outputs += queries
@@ -577,7 +590,9 @@ def multimodal_aware_multihead_attention(queries,
     # Normalize
     outputs = normalize(outputs)  # (N, T_q, C)
 
-  return outputs, att_vec
+    print(outputs.get_shape().as_list())
+
+  return outputs, k_att_vec, h_att_vec
 
 def feedforward(inputs,
         num_units=[2048, 512],
