@@ -91,13 +91,28 @@ class Model(object):
     # 予測すべきアイテムの重み [B]
     i_b = tf.gather(item_b, self.i)
 
+    # [B, T, d_i]
+    img_emb = tf.layers.dense(self.im, self.config['hidden_units'])
+    # [B, T, d_i]
+    r_emb = tf.layers.dense(self.r, self.config['hidden_units'])
+    # [B, T, 2]
+    mm_sel = tf.layers.dense(tf.concat((self.im, self.r), -1), 2, activation=tf.nn.relu)
+    # [B, T, d_i, 1]
+    img_emb = tf.expand_dims(img_emb, -1)
+    r_emb = tf.expand_dims(r_emb, -1)
+    # [B, T, d_i, 2]
+    mm_emb = tf.concat((img_emb, r_emb), -1)
+    # [B, T, d_i]
+    mm_emb = tf.einsum('ijkl,ijl->ijk', mm_emb, mm_sel)
+
+    print(mm_emb.get_shape().as_list())
+
     # 入力する各履歴の埋め込み表現 [B, T, di+da]
     # embedding_lookupでルックアップテーブルから該当する埋め込み表現を持ってくる
     h_emb = tf.concat([
         tf.nn.embedding_lookup(item_emb_w, self.hist_i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)),
-        self.im,
-        self.r,
+        mm_emb,
         ], 2)
 
     if self.config['concat_time_emb'] == True:
