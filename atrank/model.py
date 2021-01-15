@@ -186,6 +186,7 @@ class Model(object):
         tf.summary.histogram('embedding/3_time_dense', t_emb),
         tf.summary.histogram('embedding/4_final', h_emb),
         tf.summary.histogram('attention_output', u_emb),
+        tf.summary.histogram('mm_sel', mm_sel),
         tf.summary.scalar('L2_norm Loss', l2_norm),
         tf.summary.scalar('Training Loss', self.loss),
         ])
