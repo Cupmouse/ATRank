@@ -30,7 +30,8 @@ tf.app.flags.DEFINE_float('regulation_rate', 0.00005, 'L2 regulation rate')
 
 tf.app.flags.DEFINE_integer('itemid_embedding_size', 64, 'Item id embedding size')
 tf.app.flags.DEFINE_integer('cateid_embedding_size', 64, 'Cate id embedding size')
-tf.app.flags.DEFINE_integer('input_image_emb_size', 64, 'Image input embedding size')
+tf.app.flags.DEFINE_integer('image_embedding_size', 64, 'Image embedding size')
+tf.app.flags.DEFINE_integer('input_image_emb_size', 512, 'Image input embedding size')
 tf.app.flags.DEFINE_integer('input_text_emb_size', 300, 'Text input embedding size')
 
 tf.app.flags.DEFINE_boolean('concat_time_emb', True, 'Concat time-embedding instead of Add')
@@ -42,7 +43,7 @@ tf.app.flags.DEFINE_string('optimizer', 'sgd', 'Optimizer for training: (adadelt
 tf.app.flags.DEFINE_float('learning_rate', 1.0, 'Learning rate')
 tf.app.flags.DEFINE_float('max_gradient_norm', 5.0, 'Clip gradients to this norm')
 
-tf.app.flags.DEFINE_integer('train_batch_size', 32, 'Training Batch size')
+tf.app.flags.DEFINE_integer('train_batch_size', 64, 'Training Batch size')
 tf.app.flags.DEFINE_integer('test_batch_size', 128, 'Testing Batch size')
 tf.app.flags.DEFINE_integer('max_epochs', 10, 'Maximum # of training epochs')
 

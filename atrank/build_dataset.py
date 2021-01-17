@@ -74,7 +74,7 @@ for reviewerID, hist in reviews_df.groupby('reviewerID'):
 # 訓練データからPCAを訓練して全画像の次元圧縮を行う
 print('processing images...')
 
-IMG_DIMINISHED_SIZE = 64
+IMG_DIMINISHED_SIZE = 512
 
 with open('../raw_data/image_embeddings.pkl', 'rb') as f:
   image_embeddings = pickle.load(f)
