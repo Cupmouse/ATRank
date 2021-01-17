@@ -169,9 +169,6 @@ def train():
         add_summary = bool(model.global_step.eval() % FLAGS.display_freq == 0)
         step_loss = model.train(sess, uij, lr, add_summary)
         avg_loss += step_loss
-        count += 1
-        if count > 15000:
-            break
 
         if model.global_step.eval() % FLAGS.eval_freq == 0:
           test_auc = _eval(sess, test_set, model, images, img_list, texts)

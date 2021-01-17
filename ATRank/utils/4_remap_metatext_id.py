@@ -1,3 +1,4 @@
+#テキスト表現はreviewTextでなく商品のタイトルを使う
 import os
 import random
 import pickle
@@ -11,23 +12,28 @@ with open('../raw_data/reviews.pkl', 'rb') as f:
   reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime', 'reviewText']]
 with open('../raw_data/meta.pkl', 'rb') as f:
   meta_df = pickle.load(f)
-  meta_df = meta_df[['asin', 'categories', 'imUrl']]
+  meta_df = meta_df[['asin', 'categories', 'imUrl', 'title']]
 meta_df['categories'] = meta_df['categories'].map(lambda x: x[-1][-1])
+meta_df = meta_df.fillna({"title":''})
 # URLを画像埋め込み表現を取得するためのキーへ変換する
 meta_df['imUrl'] = meta_df['imUrl'].map(lambda url: os.path.basename(url) if isinstance(url, str) else 'not_available')
 
 def build_map(df, col_name):
   """キーをユニークなIDに変換する。そのキーとそのIDをマッピングする辞書との逆処理の配列を返す"""
-  key = sorted(df[col_name].unique().tolist())
+  try:
+    key = sorted(df[col_name].unique().tolist())
+  except TypeError:
+    key = df[col_name].unique().tolist()
   m = dict(zip(key, range(len(key))))
   df[col_name] = df[col_name].map(lambda x: m[x])
   return m, key
 
-# 商品、カテゴリ、レビュアーのIDを整数へ変換
+# 商品、カテゴリ、レビュアー、画像、タイトルのIDを整数へ変換
 asin_map, asin_key = build_map(meta_df, 'asin')
 cate_map, cate_key = build_map(meta_df, 'categories')
 revi_map, revi_key = build_map(reviews_df, 'reviewerID')
 img_map, img_key = build_map(meta_df, 'imUrl')
+tit_map, tit_key = build_map(meta_df, 'title')
 
 user_count, item_count, cate_count, example_count =\
     len(revi_map), len(asin_map), len(cate_map), reviews_df.shape[0]
@@ -50,6 +56,9 @@ cate_list = np.array(cate_list, dtype=np.int32)
 # 商品の画像のID
 img_list = np.array(meta_df['imUrl'], dtype=np.int32)
 
+# 商品のタイトルのID
+tit_list = np.array(meta_df['title'], dtype=np.int32)
+
 # 書き出し
 with open('../raw_data/remap.pkl', 'wb') as f:
   pickle.dump(reviews_df, f, pickle.HIGHEST_PROTOCOL) # uid, iid
@@ -58,4 +67,4 @@ with open('../raw_data/remap.pkl', 'wb') as f:
               f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((asin_key, cate_key, revi_key), f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((img_list, img_key), f, pickle.HIGHEST_PROTOCOL)
-  pickle.dump(texts, f, pickle.HIGHEST_PROTOCOL)
+  pickle.dump((tit_list, tit_key), f, pickle.HIGHEST_PROTOCOL)
