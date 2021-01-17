@@ -113,7 +113,7 @@ with open('../raw_data/text_embeddings.pkl', 'rb') as f:
   tit_missing_mask = pickle.load(f)
 
 # train_set・test_setは一つ一つのレビュー履歴についてユーザID、レビューしたアイテムID、これ以前にレビューしたアイテム、過去の履歴との時間差を含む
-with open('small_title_dataset.pkl', 'wb') as f:
+with open('title_dataset.pkl', 'wb') as f:
   pickle.dump(train_set, f, pickle.HIGHEST_PROTOCOL)
   pickle.dump(test_set, f, pickle.HIGHEST_PROTOCOL)
   pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)
