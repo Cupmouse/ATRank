@@ -43,25 +43,9 @@ def sec2vec(sentence):
 
 # レビュー文をベクトル化
 r = np.ndarray((len(tit_key), 300), dtype=np.float32)
-missing_mask = np.zeros(len(tit_key), dtype=np.bool)
 
-'''
-for i, sent in tit_key:
-  try:
-    r[i] = sec2vec(sent)
-  except :
-    print("i:" + str(i))
-    print("sent:" + str(sent))
-    print(e)
-    system.exit()
-'''
 for i in range(len(tit_key)):
-  if tit_list[i] == 20:
-    missing_mask[i] = True
-    continue
   r[i] = sec2vec(tit_key[i])
     
-
 with open('../raw_data/text_embeddings.pkl', 'wb') as f:
   pickle.dump(r, f, pickle.HIGHEST_PROTOCOL)
-  pickle.dump(missing_mask, f, pickle.HIGHEST_PROTOCOL)

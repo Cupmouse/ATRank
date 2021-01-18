@@ -6,7 +6,7 @@ import numpy as np
 random.seed(1234)
 
 # データセットの読み込みと利用する要素の選択
-with open('../raw_data/reviews.pkl', 'rb') as f:
+with open('../raw_data/small_reviews.pkl', 'rb') as f:
   reviews_df = pickle.load(f)
   reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime', 'reviewText']]
 with open('../raw_data/meta.pkl', 'rb') as f:

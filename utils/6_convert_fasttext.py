@@ -12,6 +12,7 @@ import re
 import gensim
 import tensorflow as tf
 import tensorflow_hub as hub
+import pandas as pd
 
 stop_words = set(stopwords.words('english'))
 signals = re.compile('[^a-zA-Z0-9]+')
