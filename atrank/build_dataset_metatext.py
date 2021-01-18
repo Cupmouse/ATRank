@@ -1,7 +1,6 @@
 # データセットのファイルを読み込み、埋め込みしやすい形に直して保存する
 # テキスト埋め込みは画像埋め込み同様ルックアップテーブルを使っている
 import random
-import random
 import pickle
 import numpy as np
 from sklearn import decomposition, preprocessing

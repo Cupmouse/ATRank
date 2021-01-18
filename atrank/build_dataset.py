@@ -1,4 +1,5 @@
 # データセットのファイルを読み込み、埋め込みしやすい形に直して保存する
+import random
 import pickle
 import numpy as np
 from sklearn import decomposition, preprocessing
