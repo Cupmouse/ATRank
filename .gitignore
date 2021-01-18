@@ -1,6 +1,19 @@
 *.txt
 *.pkl
 *.json
+
+# エディタ
+/.vscode
+
+# Python
 __pycache__
+
+# データ
 save_path
 raw_data
+
+# Mac
+.DS_Store
+
+# KDE Plasma
+.directory

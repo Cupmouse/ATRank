@@ -1,4 +1,6 @@
 # データセットのファイルを読み込み、埋め込みしやすい形に直して保存する
+# テキスト埋め込みは画像埋め込み同様ルックアップテーブルを使っている
+import random
 import pickle
 import numpy as np
 from sklearn import decomposition, preprocessing
@@ -15,6 +17,7 @@ with open('../raw_data/remap.pkl', 'rb') as f:
   user_count, item_count, cate_count, example_count = pickle.load(f)
   pickle.load(f)
   img_list, img_key = pickle.load(f)
+  tit_list, tit_key = pickle.load(f)
 
 # 時間をカテゴリカルな値にするためのテーブル
 # [1, 2) = 0, [2, 4) = 1, [4, 8) = 2, [8, 16) = 3...  need len(gap) hot
@@ -62,7 +65,7 @@ for reviewerID, hist in reviews_df.groupby('reviewerID'):
     hist_t = proc_time_emb(tim_list[:i], tim_list[i])
     # 一番最後の履歴はテストに、他は訓練に入れる
     if i != len(pos_list) - 1:
-      # (ユーザー, 履歴, 履歴時間, ラベル, 正例なら1でないなら0)
+      # (ユーザー, 履歴(アイテム), 履歴時間, ラベル, 正例なら1でないなら0)
       train_set.append((reviewerID, hist_i, hist_t, pos_list[i], 1))
       train_set.append((reviewerID, hist_i, hist_t, neg_list[i], 0))
     else:
@@ -105,13 +108,13 @@ assert len(test_set) == user_count
 # assert(len(test_set) + len(train_set) // 2 == reviews_df.shape[0])
 
 with open('../raw_data/text_embeddings.pkl', 'rb') as f:
-  r = pickle.load(f)
+  tit_embeddings = pickle.load(f)
 
 # train_set・test_setは一つ一つのレビュー履歴についてユーザID、レビューしたアイテムID、これ以前にレビューしたアイテム、過去の履歴との時間差を含む
-with open('dataset.pkl', 'wb') as f:
+with open('description_dataset.pkl', 'wb') as f:
   pickle.dump(train_set, f, pickle.HIGHEST_PROTOCOL)
   pickle.dump(test_set, f, pickle.HIGHEST_PROTOCOL)
   pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((user_count, item_count, cate_count), f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((img_list, image_converted), f, pickle.HIGHEST_PROTOCOL)
-  pickle.dump(r, f, pickle.HIGHEST_PROTOCOL)
+  pickle.dump((tit_list, tit_embeddings), f, pickle.HIGHEST_PROTOCOL)

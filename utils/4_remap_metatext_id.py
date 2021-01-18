@@ -12,9 +12,9 @@ with open('../raw_data/reviews.pkl', 'rb') as f:
   reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime', 'reviewText']]
 with open('../raw_data/meta.pkl', 'rb') as f:
   meta_df = pickle.load(f)
-  meta_df = meta_df[['asin', 'categories', 'imUrl', 'description']]
+  meta_df = meta_df[['asin', 'categories', 'imUrl', 'title']]
 meta_df['categories'] = meta_df['categories'].map(lambda x: x[-1][-1])
-meta_df = meta_df.fillna({"description":''})
+meta_df = meta_df.fillna({"title":''})
 # URLを画像埋め込み表現を取得するためのキーへ変換する
 meta_df['imUrl'] = meta_df['imUrl'].map(lambda url: os.path.basename(url) if isinstance(url, str) else 'not_available')
 
@@ -33,7 +33,7 @@ asin_map, asin_key = build_map(meta_df, 'asin')
 cate_map, cate_key = build_map(meta_df, 'categories')
 revi_map, revi_key = build_map(reviews_df, 'reviewerID')
 img_map, img_key = build_map(meta_df, 'imUrl')
-tit_map, tit_key = build_map(meta_df, 'description')
+tit_map, tit_key = build_map(meta_df, 'title')
 
 user_count, item_count, cate_count, example_count =\
     len(revi_map), len(asin_map), len(cate_map), reviews_df.shape[0]

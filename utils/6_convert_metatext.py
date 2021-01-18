@@ -1,7 +1,7 @@
 """FastTextを利用して文章を変換する"""
 #文の前処理を入れる
 #nltkによる分かち書き、ステミング、ストップワード除去
-#descriptionを変換
+#titleを変換
 
 import pickle
 import numpy as np
