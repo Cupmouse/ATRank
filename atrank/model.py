@@ -97,13 +97,14 @@ class Model(object):
     r_emb = tf.layers.dense(self.r, self.config['hidden_units'])
     # [B, T, 2]
     mm_sel = tf.layers.dense(tf.concat((self.im, self.r), -1), 2, activation=tf.nn.relu)
+    self.mm_sel = tf.nn.softmax(mm_sel)
     # [B, T, d_i, 1]
     img_emb = tf.expand_dims(img_emb, -1)
     r_emb = tf.expand_dims(r_emb, -1)
     # [B, T, d_i, 2]
     mm_emb = tf.concat((img_emb, r_emb), -1)
     # [B, T, d_i]
-    mm_emb = tf.einsum('ijkl,ijl->ijk', mm_emb, mm_sel)
+    mm_emb = tf.einsum('ijkl,ijl->ijk', mm_emb, self.mm_sel)
 
     print(mm_emb.get_shape().as_list())
 
@@ -186,7 +187,7 @@ class Model(object):
         tf.summary.histogram('embedding/3_time_dense', t_emb),
         tf.summary.histogram('embedding/4_final', h_emb),
         tf.summary.histogram('attention_output', u_emb),
-        tf.summary.histogram('mm_sel', mm_sel),
+        tf.summary.histogram('mm_sel', self.mm_sel),
         tf.summary.scalar('L2_norm Loss', l2_norm),
         tf.summary.scalar('Training Loss', self.loss),
         ])
@@ -275,7 +276,7 @@ class Model(object):
 
   def test(self, sess, uij):
     """uijを使ってテスト用の結果を生成"""
-    res1, att_1, stt_1 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
+    res1, att_1, stt_1, mm_sel_1 = sess.run([self.eval_logits, self.att, self.stt, self.mm_sel], feed_dict={
         self.u: uij[0],
         self.i: uij[1],
         self.hist_i: uij[3],
@@ -285,7 +286,7 @@ class Model(object):
         self.r: uij[7],
         self.is_training: False,
         })
-    res2, att_2, stt_2 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
+    res2, att_2, stt_2, mm_sel_2 = sess.run([self.eval_logits, self.att, self.stt, self.mm_sel], feed_dict={
         self.u: uij[0],
         self.i: uij[2],
         self.hist_i: uij[3],
@@ -295,7 +296,7 @@ class Model(object):
         self.r: uij[7],
         self.is_training: False,
         })
-    return res1, res2, att_1, stt_1, att_2, stt_1
+    return res1, res2, att_1, stt_1, att_2, stt_2, mm_sel_1, mm_sel_2
 
 
      
