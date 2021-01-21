@@ -116,7 +116,7 @@ def train():
     cate_list = pickle.load(f)
     user_count, item_count, cate_count = pickle.load(f)
     img_list, images = pickle.load(f)
-    texts = pickle.load(f)
+    _, texts = pickle.load(f)
 
   # Config GPU options
   if FLAGS.per_process_gpu_memory_fraction == 0.0:

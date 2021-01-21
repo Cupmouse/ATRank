@@ -47,8 +47,9 @@ class DataInput:
     # ht:履歴の時間
     # i:予測する商品のID(ラベル)
     # y:正例なら1、負例なら0
+    # hr:テキストIDの履歴
     # sl:履歴の長さ
-    u, hi, ht, i, y = zip(*ts)
+    u, hi, ht, i, y, hr = zip(*ts)
     sl = [len(h) for h in hi]
     max_sl = max(sl)
     
@@ -58,13 +59,16 @@ class DataInput:
     # hist_t:行動の時間（hist_i[i]の時間）
     # 行動時間は最後の行動からの相対時間になっている
     hist_t = np.zeros([len(ts), max_sl], np.int32)
+    # hist_r:行動のテキストID
+    hist_r = np.zeros((len(ts), max_sl), np.int32)
 
     for j in range(len(ts)):
       hist_i[j, :len(hi[j])] = hi[j]
       hist_t[j, :len(ht[j])] = ht[j]
+      hist_r[j, :len(hr[j])] = hr[j]
 
     im = self.imgs[self.img_list[hist_i]]
-    r = self.texts[hist_i]
+    r = self.texts[hist_r]
 
     return self.i, (u, i, y, hist_i, hist_t, sl, im, r)
 
@@ -102,8 +106,9 @@ class DataInputTest:
     # u:ユーザーID
     # i:正例のラベル(予測する商品のID)
     # j:負例のラベル(予測する商品のID)
+    # hr:テキストIDの履歴
     # sl:履歴の長さ
-    u, hi, ht, ij = zip(*ts)
+    u, hi, ht, ij, hr = zip(*ts)
     sl = [len(h) for h in hi]
     max_sl = max(sl)
     i, j = zip(*ij)
@@ -111,12 +116,14 @@ class DataInputTest:
     #hist_i、hist_tの形を入力長で固定させる
     hist_i = np.zeros([len(ts), max_sl], np.int32)
     hist_t = np.zeros([len(ts), max_sl], np.int32)
+    hist_r = np.zeros((len(ts), max_sl), np.int32)
     
     for k in range(len(ts)):
       hist_i[k, :len(hi[k])] = hi[k]
       hist_t[k, :len(ht[k])] = ht[k]
+      hist_r[k, :len(hr[k])] = hr[k]
 
     im = self.imgs[self.img_list[hist_i]]
-    r = self.texts[hist_i]
+    r = self.texts[hist_r]
 
     return self.i, (u, i, j, hist_i, hist_t, sl, im, r)
