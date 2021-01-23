@@ -10,7 +10,7 @@ with open('../raw_data/remap.pkl', 'rb') as f:
   pickle.load(f)
   pickle.load(f)
   pickle.load(f)
-  texts = pickle.load(f)
+  text_list, text_key = pickle.load(f)
 
 fasttext = FastText.load_fasttext_format('../raw_data/cc.en.300.bin')
 
@@ -26,9 +26,11 @@ def sec2vec(sentence):
   return np.mean(words, axis=0)
 
 # レビュー文をベクトル化
-r = np.ndarray((len(texts), 300), dtype=np.float32)
-for i, sent in enumerate(texts):
+r = np.ndarray((len(text_key), 300), dtype=np.float32)
+for i, sent in enumerate(text_key):
   r[i] = sec2vec(sent)
+  if i % 10000 == 0:
+    print('%.2f%% done (%d/%d)' % ((i / len(text_key))*100, i, len(text_key)))
 
 with open('../raw_data/text_embeddings.pkl', 'wb') as f:
   pickle.dump(r, f, pickle.HIGHEST_PROTOCOL)
