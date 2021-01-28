@@ -7,6 +7,8 @@ import pickle
 
 # AlexNetを読み込み
 alexnet = models.alexnet(pretrained=True)
+# 評価モードにしないとDropoutが適用されてしまう
+alexnet.eval()
 # 分類層の1番目の出力を特徴ベクトルとして利用
 alexnet.classifier = torch.nn.Sequential(*list(alexnet.classifier.children())[:3])
 alexnet.to('cuda')
