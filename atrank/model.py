@@ -94,10 +94,10 @@ class Model(object):
     dropout_rate = self.config['dropout']
 
     # [B, T, d_i]
-    img_emb = tf.layers.dense(self.im, self.config['hidden_units'])
+    img_emb = tf.layers.dense(self.im, self.config['hidden_units'], activation=tf.nn.relu)
     img_emb = tf.layers.dropout(img_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
     # [B, T, d_i]
-    r_emb = tf.layers.dense(self.r, self.config['hidden_units'])
+    r_emb = tf.layers.dense(self.r, self.config['hidden_units'], activation=tf.nn.relu)
     r_emb = tf.layers.dropout(r_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
     # [B, T, 2]
     mm_sel = tf.layers.dense(tf.concat((self.im, self.r), -1), 2, activation=tf.nn.relu)
