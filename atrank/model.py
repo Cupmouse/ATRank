@@ -93,7 +93,9 @@ class Model(object):
 
     dropout_rate = self.config['dropout']
 
-    img_emb = tf.layers.dense(self.im, self.config['input_image_emb_size'])
+    img_emb = tf.layers.dense(self.im, self.config['input_image_emb_size'], activation=tf.nn.relu)
+    # img_filter = tf.layers.dense(self.im, self.config['input_image_emb_size'], activation=tf.nn.sigmoid)
+    # img_emb = tf.multiply(img_emb, img_filter)
     img_emb = tf.layers.dropout(img_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
 
     # 入力する各履歴の埋め込み表現 [B, T, di+da]
