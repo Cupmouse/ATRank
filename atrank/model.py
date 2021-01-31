@@ -94,8 +94,6 @@ class Model(object):
     dropout_rate = self.config['dropout']
 
     img_emb = tf.layers.dense(self.im, self.config['input_image_emb_size'], activation=tf.nn.relu)
-    # img_filter = tf.layers.dense(self.im, self.config['input_image_emb_size'], activation=tf.nn.sigmoid)
-    # img_emb = tf.multiply(img_emb, img_filter)
     img_emb = tf.layers.dropout(img_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
 
     # 入力する各履歴の埋め込み表現 [B, T, di+da]
@@ -104,7 +102,7 @@ class Model(object):
         tf.nn.embedding_lookup(item_emb_w, self.hist_i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)),
         img_emb,
-        # self.r,
+        self.r,
         ], 2)
 
     if self.config['concat_time_emb'] == True:
