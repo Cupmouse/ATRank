@@ -95,12 +95,10 @@ class Model(object):
 
     # [B, T, d_i]
     img_emb = tf.layers.dense(self.im, self.config['hidden_units'], activation=tf.nn.relu)
-    img_emb = tf.layers.dropout(img_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
     # [B, T, d_i]
     r_emb = tf.layers.dense(self.r, self.config['hidden_units'], activation=tf.nn.relu)
-    r_emb = tf.layers.dropout(r_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
     # [B, T, 2]
-    mm_sel = tf.layers.dense(tf.concat((self.im, self.r), -1), 2, activation=tf.nn.relu)
+    mm_sel = tf.layers.dense(tf.concat((self.im, self.r), -1), 2, activation=tf.nn.sigmoid)
     self.mm_sel = tf.nn.softmax(mm_sel)
     # [B, T, d_i, 1]
     img_emb = tf.expand_dims(img_emb, -1)
@@ -109,6 +107,7 @@ class Model(object):
     mm_emb = tf.concat((img_emb, r_emb), -1)
     # [B, T, d_i]
     mm_emb = tf.einsum('ijkl,ijl->ijk', mm_emb, self.mm_sel)
+    mm_emb = tf.layers.dropout(mm_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
 
     # 入力する各履歴の埋め込み表現 [B, T, di+da]
     # embedding_lookupでルックアップテーブルから該当する埋め込み表現を持ってくる
