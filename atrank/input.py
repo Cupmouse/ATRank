@@ -71,8 +71,9 @@ class DataInput:
 
     im = self.imgs[self.img_list[hist_i]]
     r = self.texts[hist_r]
+    im_i = self.imgs[self.img_list[i]]
 
-    return self.i, (u, i, y, hist_i, hist_t, sl, im, r, im_i, r_i)
+    return self.i, (u, i, y, hist_i, hist_t, sl, im, r, im_i)
 
 class DataInputTest:
   """DataInputのテストデータバージョン"""
@@ -128,5 +129,7 @@ class DataInputTest:
 
     im = self.imgs[self.img_list[hist_i]]
     r = self.texts[hist_r]
+    im_i = self.imgs[self.img_list[i]]
+    im_j = self.imgs[self.img_list[j]]
 
-    return self.i, (u, i, j, hist_i, hist_t, sl, im, r, im_i, r_i, im_j, r_j)
+    return self.i, (u, i, j, hist_i, hist_t, sl, im, r, im_i, im_j)
