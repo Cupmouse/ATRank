@@ -2,6 +2,7 @@ import os
 import random
 import pickle
 import numpy as np
+from gensim.models.wrappers import FastText
 
 random.seed(1234)
 
@@ -28,20 +29,20 @@ asin_map, asin_key = build_map(meta_df, 'asin')
 cate_map, cate_key = build_map(meta_df, 'categories')
 revi_map, revi_key = build_map(reviews_df, 'reviewerID')
 img_map, img_key = build_map(meta_df, 'imUrl')
+text_map, text_key = build_map(reviews_df, 'reviewText')
 
 user_count, item_count, cate_count, example_count =\
     len(revi_map), len(asin_map), len(cate_map), reviews_df.shape[0]
 print('user_count: %d\titem_count: %d\tcate_count: %d\texample_count: %d' %
       (user_count, item_count, cate_count, example_count))
 print('image_count: %d' % len(img_map))
+print('text_count: %d' % len(text_map))
 
 meta_df = meta_df.sort_values('asin')
 meta_df = meta_df.reset_index(drop=True)
 reviews_df['asin'] = reviews_df['asin'].map(lambda x: asin_map[x])
 reviews_df = reviews_df.sort_values(['reviewerID', 'unixReviewTime'])
 reviews_df = reviews_df.reset_index(drop=True)
-texts = np.array(reviews_df['reviewText'], dtype=object)
-reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
 
 # ASINの並び順に商品のカテゴリだけをとってきて配列にする
 cate_list = [meta_df['categories'][i] for i in range(len(asin_map))]
@@ -49,6 +50,8 @@ cate_list = np.array(cate_list, dtype=np.int32)
 
 # 商品の画像のID
 img_list = np.array(meta_df['imUrl'], dtype=np.int32)
+# レビューのテキストのID
+text_list = np.array(reviews_df['reviewText'], dtype=np.int32)
 
 # 書き出し
 with open('../raw_data/remap.pkl', 'wb') as f:
@@ -58,4 +61,4 @@ with open('../raw_data/remap.pkl', 'wb') as f:
               f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((asin_key, cate_key, revi_key), f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((img_list, img_key), f, pickle.HIGHEST_PROTOCOL)
-  pickle.dump(texts, f, pickle.HIGHEST_PROTOCOL)
+  pickle.dump((text_list, text_key), f, pickle.HIGHEST_PROTOCOL)

@@ -15,7 +15,8 @@ with open('../raw_data/remap.pkl', 'rb') as f:
   cate_list = pickle.load(f)
   user_count, item_count, cate_count, example_count = pickle.load(f)
   pickle.load(f)
-  img_list, img_key = pickle.load(f)
+  img_list, _ = pickle.load(f)
+  text_list, _ = pickle.load(f)
 
 # 時間をカテゴリカルな値にするためのテーブル
 # [1, 2) = 0, [2, 4) = 1, [4, 8) = 2, [8, 16) = 3...  need len(gap) hot
@@ -47,6 +48,9 @@ for reviewerID, hist in reviews_df.groupby('reviewerID'):
   tim_list = hist['unixReviewTime'].tolist()
   # 時間を1日単位に変換
   tim_list = [i // 3600 // 24 for i in tim_list]
+  # テキスト表現IDのリスト
+  r_list = hist['reviewText'].tolist()
+
   def gen_neg():
     """一つの行動に対する負例の生成"""
     # 他の正例とかぶらないように繰り返しランダムでカテゴリ整数を生成
@@ -61,15 +65,16 @@ for reviewerID, hist in reviews_df.groupby('reviewerID'):
   for i in range(1, len(pos_list)):
     hist_i = pos_list[:i]
     hist_t = proc_time_emb(tim_list[:i], tim_list[i])
+    hist_r = r_list[:i]
     # 一番最後の履歴はテストに、他は訓練に入れる
     if i != len(pos_list) - 1:
       # (ユーザー, 履歴, 履歴時間, ラベル, 正例なら1でないなら0)
-      train_set.append((reviewerID, hist_i, hist_t, pos_list[i], 1))
-      train_set.append((reviewerID, hist_i, hist_t, neg_list[i], 0))
+      train_set.append((reviewerID, hist_i, hist_t, pos_list[i], 1, hist_r))
+      train_set.append((reviewerID, hist_i, hist_t, neg_list[i], 0, hist_r))
     else:
       # (ユーザー, 履歴, 履歴時間, (正例,負例))
       label = (pos_list[i], neg_list[i])
-      test_set.append((reviewerID, hist_i, hist_t, label))
+      test_set.append((reviewerID, hist_i, hist_t, label, hist_r))
 
 # 訓練データからPCAを訓練して全画像の次元圧縮を行う
 print('processing images...')
@@ -115,4 +120,4 @@ with open('dataset.pkl', 'wb') as f:
   pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((user_count, item_count, cate_count), f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((img_list, image_converted), f, pickle.HIGHEST_PROTOCOL)
-  pickle.dump(r, f, pickle.HIGHEST_PROTOCOL)
+  pickle.dump((text_list, r), f, pickle.HIGHEST_PROTOCOL)
