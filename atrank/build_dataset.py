@@ -79,29 +79,9 @@ for reviewerID, hist in reviews_df.groupby('reviewerID'):
 # 訓練データからPCAを訓練して全画像の次元圧縮を行う
 print('processing images...')
 
-IMG_DIMINISHED_SIZE = 512
-
 with open('../raw_data/image_embeddings.pkl', 'rb') as f:
   image_embeddings = pickle.load(f)
   img_missing_mask = pickle.load(f)
-
-# 同じ画像は訓練データに複数回現れるので、ユニークなものだけを集める
-img_train_mask = np.zeros(len(image_embeddings), dtype=np.bool)
-hist_i = list(itertools.chain.from_iterable([ts[1] for ts in train_set]))
-hist_img = img_list[hist_i]
-img_train_mask[hist_img] = True
-# 訓練データにあって存在する埋め込みだけをとってくる
-masking = np.logical_and(img_train_mask, np.logical_not(img_missing_mask))
-print('number of selected images to train TruncatedSVD: %d' % masking.sum())
-train_img = image_embeddings[masking]
-# 訓練データからtSVD(PCA)を訓練
-image_tsvd = decomposition.TruncatedSVD(n_components=IMG_DIMINISHED_SIZE, random_state=1234)
-standarize = preprocessing.StandardScaler()
-standarize.fit_transform(image_tsvd.fit_transform(train_img))
-# 次元圧縮
-image_converted = standarize.transform(image_tsvd.transform(image_embeddings))
-# 存在しない画像の場合は0で置き換え
-image_converted[img_missing_mask] = 0
 
 # シャフル
 random.shuffle(train_set)
@@ -119,5 +99,5 @@ with open('dataset.pkl', 'wb') as f:
   pickle.dump(test_set, f, pickle.HIGHEST_PROTOCOL)
   pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((user_count, item_count, cate_count), f, pickle.HIGHEST_PROTOCOL)
-  pickle.dump((img_list, image_converted), f, pickle.HIGHEST_PROTOCOL)
+  pickle.dump((img_list, image_embeddings), f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((text_list, r), f, pickle.HIGHEST_PROTOCOL)

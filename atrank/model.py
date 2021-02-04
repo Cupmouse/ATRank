@@ -91,7 +91,7 @@ class Model(object):
     # 予測すべきアイテムの重み [B]
     i_b = tf.gather(item_b, self.i)
 
-    image = tf.layers.dense(self.im, self.config['image_embedding_size'])
+    image = tf.layers.dense(self.im, self.config['image_embedding_size'], activation=tf.nn.relu)
 
     # 入力する各履歴の埋め込み表現 [B, T, di+da]
     # embedding_lookupでルックアップテーブルから該当する埋め込み表現を持ってくる
