@@ -98,7 +98,8 @@ class Model(object):
     # [B, T, d_i]
     r_emb = tf.layers.dense(self.r, self.config['hidden_units'], activation=tf.nn.relu)
     # [B, T, 2]
-    self.mm_sel = tf.layers.dense(tf.concat((self.im, self.r), -1), 2, activation=tf.nn.sigmoid)
+    mm_sel = tf.layers.dense(tf.concat((self.im, self.r), -1), 2, activation=tf.nn.relu)
+    self.mm_sel = tf.nn.sigmoid(mm_sel)
     # [B, T, d_i, 1]
     img_emb = tf.expand_dims(img_emb, -1)
     r_emb = tf.expand_dims(r_emb, -1)
