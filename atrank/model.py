@@ -93,6 +93,9 @@ class Model(object):
 
     dropout_rate = self.config['dropout']
 
+    h_item = tf.nn.embedding_lookup(item_emb_w, self.hist_i)
+    h_cate = tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i))
+
     # [B, T, d_i]
     img_emb = tf.layers.dense(self.im, self.config['hidden_units'], activation=tf.nn.relu)
     img_emb = tf.layers.dropout(img_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
@@ -100,7 +103,8 @@ class Model(object):
     r_emb = tf.layers.dense(self.r, self.config['hidden_units'], activation=tf.nn.relu)
     r_emb = tf.layers.dropout(r_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
     # [B, T, 2]
-    self.mm_sel = tf.layers.dense(tf.concat((self.im, self.r), -1), 2, activation=tf.nn.sigmoid)
+    decoder_in_tiled = tf.tile(tf.expand_dims(i_emb, 1), [1, tf.shape(h_item)[1], 1])
+    self.mm_sel = tf.layers.dense(tf.concat((decoder_in_tiled, h_item, h_cate, self.im, self.r), -1), 2, activation=tf.nn.sigmoid)
     # [B, T, d_i, 1]
     img_emb = tf.expand_dims(img_emb, -1)
     r_emb = tf.expand_dims(r_emb, -1)
@@ -112,8 +116,8 @@ class Model(object):
     # 入力する各履歴の埋め込み表現 [B, T, di+da]
     # embedding_lookupでルックアップテーブルから該当する埋め込み表現を持ってくる
     h_emb = tf.concat([
-        tf.nn.embedding_lookup(item_emb_w, self.hist_i),
-        tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)),
+        h_item,
+        h_cate,
         mm_emb,
         ], 2)
 
