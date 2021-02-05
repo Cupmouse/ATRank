@@ -91,7 +91,10 @@ class Model(object):
     # 予測すべきアイテムの重み [B]
     i_b = tf.gather(item_b, self.i)
 
+    dropout_rate = self.config['dropout']
+
     image = tf.layers.dense(self.im, self.config['image_embedding_size'], activation=tf.nn.relu)
+    image = tf.layers.dropout(image, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
 
     # 入力する各履歴の埋め込み表現 [B, T, di+da]
     # embedding_lookupでルックアップテーブルから該当する埋め込み表現を持ってくる
@@ -116,7 +119,6 @@ class Model(object):
     # アテンション機構を重ねる数
     num_blocks = self.config['num_blocks']
     num_heads = self.config['num_heads']
-    dropout_rate = self.config['dropout']
     # QKVをDenseで写像した後のサイズ C = di+da+dt or di+da
     num_units = h_emb.get_shape().as_list()[-1]
 
