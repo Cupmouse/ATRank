@@ -312,30 +312,6 @@ def attention_net(enc, sl, dec, num_units, num_heads, num_blocks, dropout_rate, 
   dec：デコーダーへの入力 [B, di+da]
   """
   with tf.variable_scope("all", reuse=reuse):
-    with tf.variable_scope("user_hist_group"):
-      # エンコーダー
-      for i in range(num_blocks):
-        with tf.variable_scope("num_blocks_{}".format(i)):
-          # セルフマルチヘッドアテンション
-          ### Multihead Attention
-          # enc [B, Tq, C]
-          enc, stt_vec = multihead_attention(queries=enc,
-              queries_length=sl,
-              keys=enc,
-              keys_length=sl,
-              num_units=num_units,
-              num_heads=num_heads,
-              dropout_rate=dropout_rate,
-              is_training=is_training,
-              scope="self_attention"
-              )
-
-          ### Feed Forward
-          # enc [B, Tq, C]
-          enc = feedforward(enc,
-              num_units=[num_units // 4, num_units],
-              scope="feed_forward", reuse=reuse)
-    # dec [B, 1, di+da]
     dec = tf.expand_dims(dec, 1)
     with tf.variable_scope("item_feature_group"):
       # デコーダー
@@ -362,7 +338,7 @@ def attention_net(enc, sl, dec, num_units, num_heads, num_blocks, dropout_rate, 
 
     # [B, C]
     dec = tf.reshape(dec, [-1, num_units])
-    return dec, att_vec, stt_vec
+    return dec, att_vec, att_vec
 
 
 def multihead_attention(queries,
