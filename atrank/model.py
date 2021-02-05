@@ -62,12 +62,15 @@ class Model(object):
   def build_model(self, cate_list):
     """モデルの構築"""
 
+    modal_emb_size = self.config['modal_embedding_size']
+    dropout_rate = self.config['dropout']
+
     # 変数の定義
     # 商品の埋め込み表現が保存される行列 [|I|, di]
     # ２次元のルックアップテーブル
     item_emb_w = tf.get_variable(
         "item_emb_w",
-        [self.config['item_count'], self.config['itemid_embedding_size']])
+        [self.config['item_count'], modal_emb_size])
     # 類似度のバイアスのベクトル [|I|]
     item_b = tf.get_variable(
         "item_b",
@@ -77,13 +80,17 @@ class Model(object):
     # ２次元のルックアップテーブル
     cate_emb_w = tf.get_variable(
         "cate_emb_w",
-        [self.config['cate_count'], self.config['cateid_embedding_size']])
+        [self.config['cate_count'], modal_emb_size])
     # 各商品のIDとカテゴリIDのマップ（リスト） [|I|]
     cate_list = tf.convert_to_tensor(cate_list, dtype=tf.int32)
+    # 時間の埋め込み表現
+    time_emb_w = tf.get_variable(
+        "time_emb_w",
+        (self.config['time_gap_categoized'], modal_emb_size))
 
     # アイテム埋め込みとカテゴリ埋め込みと時間の埋め込みを結合、それをDenseで写像する
     # 論文：p3左のu_ij=h_emb
-    # 予測すべきアイテムの埋め込み表現 [B, di+da]
+    # 予測すべきアイテムの埋め込み表現 [B, 2d]
     i_emb = tf.concat([
         tf.nn.embedding_lookup(item_emb_w, self.i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.i)),
@@ -91,49 +98,40 @@ class Model(object):
     # 予測すべきアイテムの重み [B]
     i_b = tf.gather(item_b, self.i)
 
-    dropout_rate = self.config['dropout']
-
-    img_emb = tf.layers.dense(self.im, self.config['input_image_emb_size'], activation=tf.nn.relu)
-    img_emb = tf.layers.dropout(img_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
-
-    # 入力する各履歴の埋め込み表現 [B, T, di+da]
     # embedding_lookupでルックアップテーブルから該当する埋め込み表現を持ってくる
-    h_emb = tf.concat([
-        tf.nn.embedding_lookup(item_emb_w, self.hist_i),
-        tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)),
-        img_emb,
-        self.r,
-        ], 2)
+    item_emb = tf.nn.embedding_lookup(item_emb_w, self.hist_i) # [B, T, d]
+    item_emb = tf.expand_dims(item_emb, 2) # [B, T, 1, d]
+    
+    cat_emb = tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)) # [B, T, d]
+    cat_emb = tf.expand_dims(cat_emb, 2) # [B, T, 1, d]
 
-    if self.config['concat_time_emb'] == True:
-      # 時間の埋め込み表現を結合 [B, T, di+da+dt]
-      t_emb = tf.one_hot(self.hist_t, 12, dtype=tf.float32)
-      h_emb = tf.concat([h_emb, t_emb], -1)
-      h_emb = tf.layers.dense(h_emb, self.config['hidden_units'])
-    else:
-      # 時間の埋め込み表現をPE [B, T, di+da]
-      t_emb = tf.layers.dense(tf.expand_dims(self.hist_t, -1),
-                              self.config['hidden_units'],
-                              activation=tf.nn.tanh)
-      h_emb += t_emb
+    img_emb = tf.layers.dense(self.im, modal_emb_size, activation=tf.nn.relu) # [B, T, d]
+    img_emb = tf.layers.dropout(img_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
+    img_emb = tf.expand_dims(img_emb, 2) # [B, T, 1, d]
+
+    text_emb = tf.layers.dense(self.r, modal_emb_size, activation=tf.nn.relu) # [B, T, d]
+    text_emb = tf.expand_dims(text_emb, 2) # [B, T, 1, d]
+
+    t_emb = tf.nn.embedding_lookup(time_emb_w, self.hist_t) # [B, T, d]
+    t_emb = tf.expand_dims(t_emb, 2) # [B, T, 1, d]
+
+    # [B, T, M, d]
+    h_emb = tf.concat((item_emb, cat_emb, img_emb, text_emb, t_emb), axis=2)
 
     # アテンション機構を重ねる数
     num_blocks = self.config['num_blocks']
     num_heads = self.config['num_heads']
-    # QKVをDenseで写像した後のサイズ C = di+da+dt or di+da
-    num_units = h_emb.get_shape().as_list()[-1]
 
     # トランスフォーマー
     # 論文：p4左数式(3)
     # u_emb [B, C]
-    u_emb, self.att, self.stt = attention_net(
+    u_emb, self.att, self.stt = transformer(
         # uij
         h_emb,
         # ユーザーの履歴の長さ
         self.sl,
         # デコーダーへの入力
         i_emb,
-        num_units,
         num_heads,
         num_blocks,
         dropout_rate,
@@ -303,11 +301,11 @@ class Model(object):
     print('model restored from %s' % path, flush=True)
 
 
-def attention_net(enc, sl, dec, num_units, num_heads, num_blocks, dropout_rate, is_training, reuse):
+def transformer(enc, sl, dec, num_heads, num_blocks, dropout_rate, is_training, reuse):
   """
   トランスフォーマー
   論文：p4 Self-Attention Layer
-  enc：履歴のバッチ [B, T, di+da+dt or di+da]
+  enc：履歴のバッチ [B, T, M, di+da+dt or di+da]
   sl：各履歴の長さ [B, T]
   dec：デコーダーへの入力 [B, di+da]
   """
@@ -318,23 +316,18 @@ def attention_net(enc, sl, dec, num_units, num_heads, num_blocks, dropout_rate, 
         with tf.variable_scope("num_blocks_{}".format(i)):
           # セルフマルチヘッドアテンション
           ### Multihead Attention
-          # enc [B, Tq, C]
-          enc, stt_vec = multihead_attention(queries=enc,
+          # enc [B, Tq, M, C]
+          enc, stt_vec = modal_head_attention(queries=enc,
               queries_length=sl,
               keys=enc,
               keys_length=sl,
-              num_units=num_units,
-              num_heads=num_heads,
               dropout_rate=dropout_rate,
               is_training=is_training,
-              scope="self_attention"
               )
 
-          ### Feed Forward
-          # enc [B, Tq, C]
-          enc = feedforward(enc,
-              num_units=[num_units // 4, num_units],
-              scope="feed_forward", reuse=reuse)
+    print(enc.get_shape().as_list())
+    # enc [B, T, C*M]
+    enc = tf.reshape(enc, (tf.shape(enc)[0], tf.shape(enc)[1], enc.get_shape()[2]*enc.get_shape()[3]))
     # dec [B, 1, di+da]
     dec = tf.expand_dims(dec, 1)
     with tf.variable_scope("item_feature_group"):
@@ -348,28 +341,213 @@ def attention_net(enc, sl, dec, num_units, num_heads, num_blocks, dropout_rate, 
               queries_length=tf.ones_like(dec[:, 0, 0], dtype=tf.int32),
               keys=enc,
               keys_length=sl,
-              num_units=num_units,
               num_heads=num_heads,
               dropout_rate=dropout_rate,
               is_training=is_training,
               scope="vanilla_attention")
 
-          # dec [B, 1, C]
-          ## Feed Forward
-          dec = feedforward(dec,
-              num_units=[num_units // 4, num_units],
-              scope="feed_forward", reuse=reuse)
-
     # [B, C]
-    dec = tf.reshape(dec, [-1, num_units])
+    dec = tf.squeeze(dec)
     return dec, att_vec, stt_vec
+
+
+def modal_dense(input_tensor,
+            num_units,
+            activation=None,
+            scope="modal_dense",
+            reuse=None):
+  """各モーダルに対して異なるDenseを適用します。
+
+  Args:
+    input_tensor: [B, T, M, C]の形をした最低2次元のテンソルです。
+    scope: スコープ。
+    num_units: 出力のベクトルの長さ。O
+    reuse: 重みを再利用するかどうか。
+  """
+  with tf.variable_scope(scope, reuse=reuse):
+    s = input_tensor.get_shape().as_list()
+    # 入力のベクトルの長さ　モーダル数
+    input_size, modality = s[-1], s[-2]
+    # 重みとバイアステンソル
+    # [M, O, C]
+    weight = tf.get_variable('weight', (modality, num_units, input_size))
+    # [M, O]
+    bias = tf.get_variable('bias', (modality, num_units))
+
+    # [B, T, M, O]
+    output = tf.einsum('mik,btmk->btmi', weight, input_tensor)
+    output += bias
+
+    # アクティベーションが指定されているなら適用
+    if activation is not None:
+      output = activation(output)
+
+    return output
+
+
+def leave_one_dense(input_tensor,
+            num_units,
+            activation=None,
+            scope='leave_one_dense',
+            reuse=None):
+  """各モーダルに対して、それ以外のモーダルをDenseに通します。
+  例：M=3 (Ma, Mb, Mc)
+  output = [dense(input[Mb]⊕input[Mc]), dense(input[Ma]⊕input[Mc]), dense(input[Ma]⊕input[Mb])]
+
+  Args:
+    input_tensor: [N, T, M, C]の形をした4次元入力のテンソルです。
+    scope: スコープ。
+    num_units: 各モーダリティのベクトルサイズ。
+    reuse: 重みを再利用するかどうか。
+  """
+  with tf.variable_scope(scope, reuse=reuse):
+    batch_size = tf.shape(input_tensor)[0]
+    series_size = tf.shape(input_tensor)[1]
+    s = input_tensor.get_shape().as_list()
+    vector_size = s[-1]
+    modality = s[-2]
+    
+    # [N, T, M, 1, C]
+    output = tf.expand_dims(input_tensor, -2)
+    # [N, T, M, M, C]
+    output = tf.tile(output, [1, 1, 1, modality, 1])
+    
+    # [M, M]
+    mask = tf.linalg.diag([False]*modality, padding_value=True)
+    # mask = tf.ones((modality, modality), dtype=np.bool)
+    # # 対角成分をFalseにする
+    # mask[[(i, i) for i in range(modality)]] = False
+    # # 定数テンソルへ変換
+    # mask = tf.constant(mask)
+
+    # 対角成分がなくなり、M-1, Mが一次元にまとまる、順番に注意
+    output = tf.boolean_mask(output, mask, axis=2)
+    # 変形、自身のモーダルのみを除いたテンソルになる
+    # [N, T, M-1, M, C]
+    output = tf.reshape(output, (batch_size, series_size, modality-1, modality, vector_size))
+    # [N, T, M, M-1, C]
+    output = tf.transpose(output, [0, 1, 3, 2 ,4])
+    # [N, T, M, (M-1)*C]
+    output = tf.reshape(output, (batch_size, series_size, modality, (modality-1)*vector_size))
+
+    # [N, T, M, O]
+    output = modal_dense(output, num_units, activation=activation, reuse=reuse)
+
+    return output
+
+
+def modal_head_attention(queries,
+            queries_length,
+            keys,
+            keys_length,
+            dropout_rate=0,
+            is_training=True,
+            scope="modal_head_attention",
+            reuse=None):
+  '''Applies multihead attention.
+
+  Args:
+    queries: A 4d tensor with shape of [N, T_q, M, C_q].
+    queries_length: A 1d tensor with shape of [N].
+    keys: A 4d tensor with shape of [N, T_k, M, C_k].
+    keys_length:  A 1d tensor with shape of [N].
+    dropout_rate: A floating point number.
+    is_training: Boolean. Controller of mechanism for dropout.
+    scope: Optional scope for `variable_scope`.
+    reuse: Boolean, whether to reuse the weights of a previous layer
+    by the same name.
+
+  Returns
+    A 4d tensor with shape of (N, T_q, M, C)
+  '''
+  with tf.variable_scope(scope, reuse=reuse):
+    q_shape = queries.get_shape().as_list()
+    # ベクトルの次元
+    num_units = q_shape[-1]
+    # モーダルの数
+    modality = q_shape[-2]
+
+    # queries ----> leave-one-dense(relu) ----> Q
+    #
+    # keys    --+-> modal-dense(relu)     ----> K
+    #           |
+    #           +-> modal-dense(relu)     ----> V
+    # Linear projections, C = # dim or column, T_x = # vectors or actions
+    Q = leave_one_dense(queries, num_units, activation=tf.nn.relu, scope='query_dense', reuse=reuse)  # (N, T_q, M, C)
+    Q = tf.transpose(Q, [0, 2, 1, 3]) # (N, M, T_q, C)
+    K = modal_dense(keys, num_units, activation=tf.nn.relu, scope='key_dense', reuse=reuse)  # (N, T_k, M, C)
+    K = tf.transpose(K, [0, 2, 1, 3]) # (N, M, T_q, C)
+    V = modal_dense(keys, num_units, activation=tf.nn.relu, scope='value_dense', reuse=reuse)  # (N, T_k, M, C)
+    V = tf.transpose(V, [0, 2, 1, 3]) # (N, M, T_q, C)
+
+    # アテンションスコアの算出（QK^T）
+    # Multiplication
+    # query-key score matrix
+    # each big score matrix is then split into h score matrix with same size
+    # w.r.t. different part of the feature
+    outputs = tf.matmul(Q, K, transpose_b=True)  # (N, M, T_q, T_k)
+
+    # sqrt(C)で割る
+    # Scale
+    outputs = outputs / (num_units ** 0.5)
+
+    # Key Masking
+    # keysは可変の長さを持つ(keys_lengthで定義)、値のある要素だけを示すマスクを生成する
+    key_masks = tf.sequence_mask(keys_length, tf.shape(keys)[1])   # (N, T_k)
+    # 複製する
+    key_masks = tf.expand_dims(key_masks, 1)  # (N, 1, T_k)
+    key_masks = tf.expand_dims(key_masks, 2)  # (N, 1, 1, T_k)
+    key_masks = tf.tile(key_masks, [1, modality, tf.shape(queries)[1], 1])  # (N, M, T_q, T_k)
+
+    # -2^32+1は無限大として考える、outputsと同じ形を持つすべての要素が無限大の行列paddingsを作る
+    paddings = tf.ones_like(outputs) * (-2 ** 32 + 1)
+    # outputsにマスクを適用する、key_masksがTrueの要素はoutputsで、Falseはpaddingsで塗りつぶす
+    outputs = tf.where(key_masks, outputs, paddings)  # (N, M, T_q, T_k)
+
+    # 文章のトランスフォーマーとは違い、予測に必要な以外の将来の行動をマスクする必要はないので実装していない
+    # Causality = Future blinding: No use, removed
+
+    # 最後の次元、T_kのaxisでsoftmaxが実行される
+    # Activation
+    outputs = tf.nn.softmax(outputs)  # (N, M, T_q, T_k)
+
+    # keysのマスキングは行ったが、queryのマスキングは行っていないので行う
+    # Query Masking
+    query_masks = tf.sequence_mask(queries_length, tf.shape(queries)[1], dtype=tf.float32)   # (N, T_q)
+    query_masks = tf.expand_dims(query_masks, 1)  # (N, 1, T_q)
+    query_masks = tf.expand_dims(query_masks, -1)  # (N, 1, T_q, 1)
+    query_masks = tf.tile(query_masks, (1, modality, 1, tf.shape(keys)[1]))  # (N, M, T_q, T_k)
+    outputs *= query_masks  # broadcasting. (N, M, T_q, T_k)
+
+    # Attention vector
+    att_vec = outputs
+
+    # Dropouts
+    outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
+
+    # Weighted sum
+    outputs = tf.matmul(outputs, V)  # (N, M, T_q, C)
+    
+    outputs = tf.transpose(outputs, [0, 2, 1, 3]) # (N, T_q, M, C)
+
+    # Residual connection
+    outputs += queries
+
+    # Normalize and Feed Forward
+    ff = [None]*modality
+    for i in range(modality):
+      ff[i] = normalize(outputs[:, :, i])
+      ff[i] = feedforward(ff[i], num_units=[num_units // 4, num_units], scope='ff_modal_%d' % i, reuse=reuse)
+      ff[i] = tf.expand_dims(ff[i], 2)
+    outputs = tf.concat(ff, axis=2) # [B, T_q, M, C]
+
+  return outputs, att_vec
 
 
 def multihead_attention(queries,
             queries_length,
             keys,
             keys_length,
-            num_units=None,
             num_heads=8,
             dropout_rate=0,
             is_training=True,
@@ -394,9 +572,7 @@ def multihead_attention(queries,
     A 3d tensor with shape of (N, T_q, C)
   '''
   with tf.variable_scope(scope, reuse=reuse):
-    # Set the fall back option for num_units
-    if num_units is None:
-      num_units = queries.get_shape().as_list[-1]
+    num_units = queries.get_shape().as_list()[-1]
 
     # queries ----> dense(relu) ----> Q
     #
@@ -469,6 +645,9 @@ def multihead_attention(queries,
 
     # Normalize
     outputs = normalize(outputs)  # (N, T_q, C)
+
+    ## Feed Forward
+    outputs = feedforward(outputs, num_units=[num_units // 4, num_units], reuse=reuse)
 
   return outputs, att_vec
 
