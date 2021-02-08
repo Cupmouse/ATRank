@@ -325,7 +325,6 @@ def transformer(enc, sl, dec, num_heads, num_blocks, dropout_rate, is_training, 
               is_training=is_training,
               )
 
-    print(enc.get_shape().as_list())
     # enc [B, T, C*M]
     enc = tf.reshape(enc, (tf.shape(enc)[0], tf.shape(enc)[1], enc.get_shape()[2]*enc.get_shape()[3]))
     # dec [B, 1, di+da]
@@ -397,7 +396,7 @@ def leave_one_dense(input_tensor,
   Args:
     input_tensor: [N, T, M, C]の形をした4次元入力のテンソルです。
     scope: スコープ。
-    num_units: 各モーダリティのベクトルサイズ。
+    num_units: 出力のベクトルサイズ。
     reuse: 重みを再利用するかどうか。
   """
   with tf.variable_scope(scope, reuse=reuse):
@@ -426,7 +425,7 @@ def leave_one_dense(input_tensor,
     # [N, T, M-1, M, C]
     output = tf.reshape(output, (batch_size, series_size, modality-1, modality, vector_size))
     # [N, T, M, M-1, C]
-    output = tf.transpose(output, [0, 1, 3, 2 ,4])
+    output = tf.transpose(output, [0, 1, 3, 2, 4])
     # [N, T, M, (M-1)*C]
     output = tf.reshape(output, (batch_size, series_size, modality, (modality-1)*vector_size))
 
