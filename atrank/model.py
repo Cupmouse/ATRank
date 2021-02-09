@@ -457,75 +457,60 @@ def modal_head_attention(queries,
     #           +-> modal-dense(relu)     ----> V
     # Linear projections, C = # dim or column, T_x = # vectors or actions
     Q = modal_dense(queries, num_units, activation=tf.nn.relu, scope='query_dense', reuse=reuse)  # (N, T_q, M, C)
-    Q = tf.transpose(Q, [0, 2, 1, 3]) # (N, M, T_q, C)
     K = leave_one_dense(keys, num_units, activation=tf.nn.relu, scope='key_dense', reuse=reuse)  # (N, T_k, M, C)
-    K = tf.transpose(K, [0, 2, 1, 3]) # (N, M, T_q, C)
     V = leave_one_dense(keys, num_units, activation=tf.nn.relu, scope='value_dense', reuse=reuse)  # (N, T_k, M, C)
-    V = tf.transpose(V, [0, 2, 1, 3]) # (N, M, T_q, C)
 
-    # アテンションスコアの算出（QK^T）
+    # アテンションスコアの算出
     # Multiplication
     # query-key score matrix
     # each big score matrix is then split into h score matrix with same size
     # w.r.t. different part of the feature
-    outputs = tf.matmul(Q, K, transpose_b=True)  # (N, M, T_q, T_k)
-
-    # sqrt(C)で割る
-    # Scale
-    outputs = outputs / (num_units ** 0.5)
-
+    att = tf.einsum('bqmi,bkni->bqmkn', Q, K) # (N, T_q, M, T_k, M)
+    
     # Key Masking
     # keysは可変の長さを持つ(keys_lengthで定義)、値のある要素だけを示すマスクを生成する
     key_masks = tf.sequence_mask(keys_length, tf.shape(keys)[1])   # (N, T_k)
     # 複製する
     key_masks = tf.expand_dims(key_masks, 1)  # (N, 1, T_k)
     key_masks = tf.expand_dims(key_masks, 2)  # (N, 1, 1, T_k)
-    key_masks = tf.tile(key_masks, [1, modality, tf.shape(queries)[1], 1])  # (N, M, T_q, T_k)
-
-    # -2^32+1は無限大として考える、outputsと同じ形を持つすべての要素が無限大の行列paddingsを作る
-    paddings = tf.ones_like(outputs) * (-2 ** 32 + 1)
-    # outputsにマスクを適用する、key_masksがTrueの要素はoutputsで、Falseはpaddingsで塗りつぶす
-    outputs = tf.where(key_masks, outputs, paddings)  # (N, M, T_q, T_k)
+    key_masks = tf.expand_dims(key_masks, 4)  # (N, 1, 1, T_k, 1)
+    key_masks = tf.tile(key_masks, [1, tf.shape(queries)[1], modality, 1, modality])  # (N, T_q, M, T_k, M)
+    # -2^32+1は無限大として考える、attと同じ形を持つすべての要素が無限大の行列paddingsを作る
+    paddings = tf.ones_like(att) * (-2 ** 32 + 1)
+    # attにマスクを適用する、key_masksがTrueの要素はoutputsで、Falseはpaddingsで塗りつぶす
+    att = tf.where(key_masks, att, paddings)  # (N, T_q, M, T_k, M)
 
     # 文章のトランスフォーマーとは違い、予測に必要な以外の将来の行動をマスクする必要はないので実装していない
     # Causality = Future blinding: No use, removed
 
-    # 最後の次元、T_kのaxisでsoftmaxが実行される
-    # Activation
-    outputs = tf.nn.softmax(outputs)  # (N, M, T_q, T_k)
+    # Softmaxを最後の2ランクに適用
+    exp = tf.exp(att) # (N, Tq, M, Tk, M)
+    reduced = tf.reduce_sum(exp, axis=(-1, -2), keepdims=True) # (N, T_q, M)
+    att = exp / reduced # (N, T_q, M, T_k, M)
 
     # keysのマスキングは行ったが、queryのマスキングは行っていないので行う
     # Query Masking
     query_masks = tf.sequence_mask(queries_length, tf.shape(queries)[1], dtype=tf.float32)   # (N, T_q)
-    query_masks = tf.expand_dims(query_masks, 1)  # (N, 1, T_q)
-    query_masks = tf.expand_dims(query_masks, -1)  # (N, 1, T_q, 1)
-    query_masks = tf.tile(query_masks, (1, modality, 1, tf.shape(keys)[1]))  # (N, M, T_q, T_k)
-    outputs *= query_masks  # broadcasting. (N, M, T_q, T_k)
-
-    # Attention vector
-    att_vec = outputs
+    query_masks = tf.expand_dims(query_masks, 2)  # (N, T_q, 1)
+    query_masks = tf.expand_dims(query_masks, 3)  # (N, T_q, 1, 1)
+    query_masks = tf.expand_dims(query_masks, 4)  # (N, T_q, 1, 1, 1)
+    query_masks = tf.tile(query_masks, (1, 1, modality, tf.shape(keys)[1], modality))  # (N, T_q, M, T_k, M)
+    att *= query_masks  # broadcasting. (N, T_q, M, T_k, M)
 
     # Dropouts
-    outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
+    outputs = tf.layers.dropout(att, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
 
     # Weighted sum
-    outputs = tf.matmul(outputs, V)  # (N, M, T_q, C)
+    outputs = tf.einsum('bqni,bqmkn->bqmi', V, outputs) # (N, T_q, M, C)
     
-    outputs = tf.transpose(outputs, [0, 2, 1, 3]) # (N, T_q, M, C)
-
     # Residual connection
     outputs += queries
 
     # Normalize and Feed Forward
-    unstacked = tf.unstack(outputs, axis=2)
-    unstacked = [normalize(u, scope='norm_%d' % i) for i, u in enumerate(unstacked)]
-    unstacked = [feedforward(u,
-                  num_units=[num_units // 4, num_units],
-                  scope='ff_modal_%d' % i,
-                  reuse=reuse) for i, u in enumerate(unstacked)]
-    outputs = tf.stack(unstacked, axis=2)
+    outputs = normalize(outputs)
+    outputs = feedforward(outputs, num_units=[num_units // 4, num_units], reuse=reuse)
 
-  return outputs, att_vec
+  return outputs, att
 
 
 def multihead_attention(queries,
