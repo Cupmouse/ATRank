@@ -93,8 +93,10 @@ class Model(object):
 
     dropout_rate = self.config['dropout']
 
-    image = tf.layers.dense(self.im, self.config['image_embedding_size'], activation=tf.nn.relu)
-    image = tf.layers.dropout(image, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
+    image = tf.layers.dropout(self.im, rate=0.5, training=tf.convert_to_tensor(self.is_training))
+    image = tf.layers.dense(image, self.config['input_image_emb_size'], activation=tf.nn.relu)
+    image = tf.layers.dense(image, self.config['image_embedding_size'], activation=tf.nn.relu)
+    image = tf.layers.dropout(image, rate=0.5, training=tf.convert_to_tensor(self.is_training))
 
     # 入力する各履歴の埋め込み表現 [B, T, di+da]
     # embedding_lookupでルックアップテーブルから該当する埋め込み表現を持ってくる
