@@ -456,11 +456,11 @@ def modal_head_attention(queries,
     #           |
     #           +-> modal-dense(relu)     ----> V
     # Linear projections, C = # dim or column, T_x = # vectors or actions
-    Q = leave_one_dense(queries, num_units, activation=tf.nn.relu, scope='query_dense', reuse=reuse)  # (N, T_q, M, C)
+    Q = modal_dense(queries, num_units, activation=tf.nn.relu, scope='query_dense', reuse=reuse)  # (N, T_q, M, C)
     Q = tf.transpose(Q, [0, 2, 1, 3]) # (N, M, T_q, C)
-    K = modal_dense(keys, num_units, activation=tf.nn.relu, scope='key_dense', reuse=reuse)  # (N, T_k, M, C)
+    K = leave_one_dense(keys, num_units, activation=tf.nn.relu, scope='key_dense', reuse=reuse)  # (N, T_k, M, C)
     K = tf.transpose(K, [0, 2, 1, 3]) # (N, M, T_q, C)
-    V = modal_dense(keys, num_units, activation=tf.nn.relu, scope='value_dense', reuse=reuse)  # (N, T_k, M, C)
+    V = leave_one_dense(keys, num_units, activation=tf.nn.relu, scope='value_dense', reuse=reuse)  # (N, T_k, M, C)
     V = tf.transpose(V, [0, 2, 1, 3]) # (N, M, T_q, C)
 
     # アテンションスコアの算出（QK^T）
