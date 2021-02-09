@@ -132,8 +132,9 @@ class Model(object):
         self.sl,
         # デコーダーへの入力
         i_emb,
-        num_heads,
         num_blocks,
+        num_blocks,
+        num_heads,
         dropout_rate,
         self.is_training,
         False)
@@ -301,7 +302,7 @@ class Model(object):
     print('model restored from %s' % path, flush=True)
 
 
-def transformer(enc, sl, dec, num_heads, num_blocks, dropout_rate, is_training, reuse):
+def transformer(enc, sl, dec, enc_blocks, dec_blocks, dec_heads, dropout_rate, is_training, reuse):
   """
   トランスフォーマー
   論文：p4 Self-Attention Layer
@@ -310,10 +311,10 @@ def transformer(enc, sl, dec, num_heads, num_blocks, dropout_rate, is_training, 
   dec：デコーダーへの入力 [B, di+da]
   """
   with tf.variable_scope("all", reuse=reuse):
-    with tf.variable_scope("user_hist_group"):
+    with tf.variable_scope("encoder"):
       # エンコーダー
-      for i in range(num_blocks):
-        with tf.variable_scope("num_blocks_{}".format(i)):
+      for i in range(enc_blocks):
+        with tf.variable_scope("block_{}".format(i)):
           # セルフマルチヘッドアテンション
           ### Multihead Attention
           # enc [B, Tq, M, C]
@@ -322,17 +323,16 @@ def transformer(enc, sl, dec, num_heads, num_blocks, dropout_rate, is_training, 
               keys=enc,
               keys_length=sl,
               dropout_rate=dropout_rate,
-              is_training=is_training,
-              )
+              is_training=is_training)
 
     # enc [B, T, C*M]
     enc = tf.reshape(enc, (tf.shape(enc)[0], tf.shape(enc)[1], enc.get_shape()[2]*enc.get_shape()[3]))
     # dec [B, 1, di+da]
     dec = tf.expand_dims(dec, 1)
-    with tf.variable_scope("item_feature_group"):
+    with tf.variable_scope("decoder"):
       # デコーダー
-      for i in range(num_blocks):
-        with tf.variable_scope("num_blocks_{}".format(i)):
+      for i in range(dec_blocks):
+        with tf.variable_scope("block_{}".format(i)):
           ## Multihead Attention ( vanilla attention)
           # decを使ってencにアテンション
           # dec [B, 1, C]
@@ -340,7 +340,7 @@ def transformer(enc, sl, dec, num_heads, num_blocks, dropout_rate, is_training, 
               queries_length=tf.ones_like(dec[:, 0, 0], dtype=tf.int32),
               keys=enc,
               keys_length=sl,
-              num_heads=num_heads,
+              num_heads=dec_heads,
               dropout_rate=dropout_rate,
               is_training=is_training,
               scope="vanilla_attention")
@@ -517,12 +517,13 @@ def modal_head_attention(queries,
     outputs += queries
 
     # Normalize and Feed Forward
-    ff = [None]*modality
-    for i in range(modality):
-      ff[i] = normalize(outputs[:, :, i])
-      ff[i] = feedforward(ff[i], num_units=[num_units // 4, num_units], scope='ff_modal_%d' % i, reuse=reuse)
-      ff[i] = tf.expand_dims(ff[i], 2)
-    outputs = tf.concat(ff, axis=2) # [B, T_q, M, C]
+    unstacked = tf.unstack(outputs, axis=2)
+    unstacked = [normalize(u, scope='norm_%d' % i) for i, u in enumerate(unstacked)]
+    unstacked = [feedforward(u,
+                  num_units=[num_units // 4, num_units],
+                  scope='ff_modal_%d' % i,
+                  reuse=reuse) for i, u in enumerate(unstacked)]
+    outputs = tf.stack(unstacked, axis=2)
 
   return outputs, att_vec
 
@@ -671,7 +672,7 @@ def feedforward(inputs,
 
 def normalize(inputs,
         epsilon=1e-8,
-        scope="ln",
+        scope="normalize",
         reuse=None):
   '''Applies layer normalization.
 
