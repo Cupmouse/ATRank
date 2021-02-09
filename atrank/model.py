@@ -507,8 +507,13 @@ def modal_head_attention(queries,
     outputs += queries
 
     # Normalize and Feed Forward
-    outputs = normalize(outputs)
-    outputs = feedforward(outputs, num_units=[num_units // 4, num_units], reuse=reuse)
+    unstacked = tf.unstack(outputs, axis=2)
+    unstacked = [normalize(u, scope='norm_%d' % i) for i, u in enumerate(unstacked)]
+    unstacked = [feedforward(u,
+                  num_units=[num_units // 4, num_units],
+                  scope='ff_modal_%d' % i,
+                  reuse=reuse) for i, u in enumerate(unstacked)]
+    outputs = tf.stack(unstacked, axis=2)
 
   return outputs, att
 
