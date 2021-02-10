@@ -485,9 +485,8 @@ def modal_head_attention(queries,
     # Causality = Future blinding: No use, removed
 
     # Softmaxを最後の2ランクに適用
-    exp = tf.exp(att) # (N, Tq, M, Tk, M)
-    reduced = tf.reduce_sum(exp, axis=(-1, -2), keepdims=True) # (N, T_q, M)
-    att = exp / reduced # (N, T_q, M, T_k, M)
+    att = tf.exp(att - tf.reduce_max(att, axis=(-1, -2), keepdims=True))
+    att = att / tf.reduce_sum(att, axis=(-1, -2), keepdims=True) # (N, T_q, M, T_k, M)
 
     # keysのマスキングは行ったが、queryのマスキングは行っていないので行う
     # Query Masking
