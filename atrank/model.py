@@ -158,6 +158,7 @@ class Model(object):
     l2_norm = tf.add_n([
         tf.nn.l2_loss(u_emb),
         tf.nn.l2_loss(i_emb),
+        tf.nn.l2_loss(t_emb),
         ])
 
     # ロス定義、ペアワイズ、シグモイド相互情報量
