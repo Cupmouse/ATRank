@@ -90,11 +90,11 @@ class Model(object):
 
     # アイテム埋め込みとカテゴリ埋め込みと時間の埋め込みを結合、それをDenseで写像する
     # 論文：p3左のu_ij=h_emb
-    # 予測すべきアイテムの埋め込み表現 [B, 2d]
-    self.i_emb = tf.concat([
+    # 予測すべきアイテムの埋め込み表現 [B, M, C]
+    self.i_emb = tf.stack([
         tf.nn.embedding_lookup(item_emb_w, self.i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.i)),
-        ], 1)
+      ], 1)
     # 予測すべきアイテムの重み [B]
     i_b = tf.gather(item_b, self.i)
 
@@ -115,11 +115,10 @@ class Model(object):
 
     # アテンション機構を重ねる数
     num_blocks = self.config['num_blocks']
-    num_heads = self.config['num_heads']
 
     # トランスフォーマー
     # 論文：p4左数式(3)
-    # u_emb [B, C]
+    # u_emb [B, M, C]
     self.u_emb, self.enc_att, self.dec_att = transformer(
         # uij
         self.h_emb,
@@ -129,14 +128,13 @@ class Model(object):
         self.i_emb,
         num_blocks,
         num_blocks,
-        num_heads,
         dropout_rate,
         self.is_training,
         False)
 
     # 予測
-    # 論文：p4右数式(7)&(8) f(h_t, et_u) reduce_sum([B, C]) [B]
-    self.logits = i_b + tf.reduce_sum(tf.multiply(self.u_emb, self.i_emb), 1)
+    # 論文：p4右数式(7)&(8) f(h_t, et_u) einsum([B, M, C], [B, M, C]) [B]
+    self.logits = i_b + tf.einsum('bmi,bmi->b', self.u_emb, self.i_emb)
 
     # ============== Eval ===============
     self.eval_logits = self.logits
@@ -298,7 +296,7 @@ class Model(object):
     print('model restored from %s' % path, flush=True)
 
 
-def transformer(enc, sl, dec, enc_blocks, dec_blocks, dec_heads, dropout_rate, is_training, reuse):
+def transformer(enc, sl, dec, enc_blocks, dec_blocks, dropout_rate, is_training, reuse):
   """
   トランスフォーマー
   論文：p4 Self-Attention Layer
@@ -306,6 +304,9 @@ def transformer(enc, sl, dec, enc_blocks, dec_blocks, dec_heads, dropout_rate, i
   sl：各履歴の長さ [B, T]
   dec：デコーダーへの入力 [B, di+da]
   """
+  # dec [B, 1, M, C]
+  dec = tf.expand_dims(dec, 1)
+
   with tf.variable_scope("all", reuse=reuse):
     with tf.variable_scope("encoder"):
       # エンコーダー
@@ -313,7 +314,7 @@ def transformer(enc, sl, dec, enc_blocks, dec_blocks, dec_heads, dropout_rate, i
         with tf.variable_scope("block_{}".format(i)):
           # セルフマルチヘッドアテンション
           ### Multihead Attention
-          # enc [B, Tq, M, C]
+          # enc [B, Tq, C]*M
           enc, enc_att = modal_head_attention(queries=enc,
               queries_length=sl,
               keys=enc,
@@ -321,28 +322,21 @@ def transformer(enc, sl, dec, enc_blocks, dec_blocks, dec_heads, dropout_rate, i
               dropout_rate=dropout_rate,
               is_training=is_training)
 
-    # enc [B, T, C*M]
-    enc = tf.reshape(enc, (tf.shape(enc)[0], tf.shape(enc)[1], enc.get_shape()[2]*enc.get_shape()[3]))
-    # dec [B, 1, di+da]
-    dec = tf.expand_dims(dec, 1)
     with tf.variable_scope("decoder"):
       # デコーダー
       for i in range(dec_blocks):
         with tf.variable_scope("block_{}".format(i)):
-          ## Multihead Attention ( vanilla attention)
           # decを使ってencにアテンション
-          # dec [B, 1, C]
-          dec, dec_att = multihead_attention(queries=dec,
-              queries_length=tf.ones_like(dec[:, 0, 0], dtype=tf.int32),
+          # dec [B, 1, C]*M
+          dec, dec_att = modal_head_attention(queries=dec,
+              queries_length=tf.ones(tf.shape(dec)[0], dtype=tf.int32),
               keys=enc,
               keys_length=sl,
-              num_heads=dec_heads,
               dropout_rate=dropout_rate,
-              is_training=is_training,
-              scope="vanilla_attention")
+              is_training=is_training)
 
-    # [B, C]
     dec = tf.squeeze(dec)
+
     return dec, enc_att, dec_att
 
 
@@ -426,9 +420,9 @@ def modal_head_attention(queries,
   '''Applies multihead attention.
 
   Args:
-    queries: A 4d tensor with shape of [N, T_q, M, C_q].
+    queries: A 4d tensor with shape of [N, T_q, M_q, C_q].
     queries_length: A 1d tensor with shape of [N].
-    keys: A 4d tensor with shape of [N, T_k, M, C_k].
+    keys: A 4d tensor with shape of [N, T_k, M_k, C_k].
     keys_length:  A 1d tensor with shape of [N].
     dropout_rate: A floating point number.
     is_training: Boolean. Controller of mechanism for dropout.
@@ -437,14 +431,15 @@ def modal_head_attention(queries,
     by the same name.
 
   Returns
-    A 4d tensor with shape of (N, T_q, M, C)
+    A list of 3d tensor with shape of (N, T_q, C) for each modality.
   '''
   with tf.variable_scope(scope, reuse=reuse):
     q_shape = queries.get_shape().as_list()
     # ベクトルの次元
     num_units = q_shape[-1]
     # モーダルの数
-    modality = q_shape[-2]
+    q_modality = q_shape[-2]
+    k_modality = keys.get_shape().as_list()[-2]
 
     # queries ----> leave-one-dense(relu) ----> Q
     #
@@ -470,155 +465,48 @@ def modal_head_attention(queries,
     key_masks = tf.expand_dims(key_masks, 1)  # (N, 1, T_k)
     key_masks = tf.expand_dims(key_masks, 2)  # (N, 1, 1, T_k)
     key_masks = tf.expand_dims(key_masks, 4)  # (N, 1, 1, T_k, 1)
-    key_masks = tf.tile(key_masks, [1, tf.shape(queries)[1], modality, 1, modality])  # (N, T_q, M, T_k, M)
+    key_masks = tf.tile(key_masks, [1, tf.shape(queries)[1], q_modality, 1, k_modality])  # (N, T_q, M_q, T_k, M_k)
     # -2^32+1は無限大として考える、attと同じ形を持つすべての要素が無限大の行列paddingsを作る
     paddings = tf.ones_like(att) * (-2 ** 32 + 1)
     # attにマスクを適用する、key_masksがTrueの要素はoutputsで、Falseはpaddingsで塗りつぶす
-    att = tf.where(key_masks, att, paddings)  # (N, T_q, M, T_k, M)
+    att = tf.where(key_masks, att, paddings)  # (N, T_q, M_q, T_k, M_k)
 
     # 文章のトランスフォーマーとは違い、予測に必要な以外の将来の行動をマスクする必要はないので実装していない
     # Causality = Future blinding: No use, removed
 
     # Softmaxを最後の2ランクに適用
     att = tf.exp(att - tf.reduce_max(att, axis=(-1, -2), keepdims=True))
-    att = att / tf.reduce_sum(att, axis=(-1, -2), keepdims=True) # (N, T_q, M, T_k, M)
+    att = att / tf.reduce_sum(att, axis=(-1, -2), keepdims=True) # (N, T_q, M_q, T_k, M_k)
 
     # keysのマスキングは行ったが、queryのマスキングは行っていないので行う
     # Query Masking
     query_masks = tf.sequence_mask(queries_length, tf.shape(queries)[1], dtype=tf.float32)   # (N, T_q)
-    query_masks = tf.expand_dims(query_masks, 2)  # (N, T_q, 1)
-    query_masks = tf.expand_dims(query_masks, 3)  # (N, T_q, 1, 1)
-    query_masks = tf.expand_dims(query_masks, 4)  # (N, T_q, 1, 1, 1)
-    query_masks = tf.tile(query_masks, (1, 1, modality, tf.shape(keys)[1], modality))  # (N, T_q, M, T_k, M)
-    att *= query_masks  # broadcasting. (N, T_q, M, T_k, M)
+    query_masks = tf.expand_dims(query_masks, -1)  # (N, T_q, 1)
+    query_masks = tf.expand_dims(query_masks, -1)  # (N, T_q, 1, 1)
+    query_masks = tf.expand_dims(query_masks, -1)  # (N, T_q, 1, 1, 1)
+    query_masks = tf.tile(query_masks, (1, 1, q_modality, tf.shape(keys)[1], k_modality))  # (N, T_q, M_q, T_k, M_k)
+    att *= query_masks  # broadcasting. (N, T_q, M_q, T_k, M_k)
 
     # Dropouts
     outputs = tf.layers.dropout(att, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
 
-    # Weighted sum
-    outputs = tf.einsum('bqni,bqmkn->bqmi', V, outputs) # (N, T_q, M, C)
+    # Weighted sum (N, T_k, M_k, C) x (N, T_q, M_q, T_k, M_k)
+    outputs = tf.einsum('bkni,bqmkn->bqmi', V, outputs) # (N, T_q, M_q, C)
     
     # Residual connection
     outputs += queries
 
-    # Normalize and Feed Forward
-    unstacked = tf.unstack(outputs, axis=2)
-    unstacked = [normalize(u, scope='norm_%d' % i) for i, u in enumerate(unstacked)]
-    unstacked = [feedforward(u,
+    # Normalize
+    outputs = tf.unstack(outputs, axis=2)
+    outputs = [normalize(u, scope='norm_%d' % i) for i, u in enumerate(outputs)]
+    outputs = [feedforward(u,
                   num_units=[num_units // 4, num_units],
                   scope='ff_modal_%d' % i,
-                  reuse=reuse) for i, u in enumerate(unstacked)]
-    outputs = tf.stack(unstacked, axis=2)
+                  reuse=reuse) for i, u in enumerate(outputs)]
+    outputs = tf.stack(outputs, axis=2) # [B, Tq, M, C]
 
   return outputs, att
 
-
-def multihead_attention(queries,
-            queries_length,
-            keys,
-            keys_length,
-            num_heads=8,
-            dropout_rate=0,
-            is_training=True,
-            scope="multihead_attention",
-            reuse=None):
-  '''Applies multihead attention.
-
-  Args:
-    queries: A 3d tensor with shape of [N, T_q, C_q].
-    queries_length: A 1d tensor with shape of [N].
-    keys: A 3d tensor with shape of [N, T_k, C_k].
-    keys_length:  A 1d tensor with shape of [N].
-    num_units: A scalar. Attention size.
-    dropout_rate: A floating point number.
-    is_training: Boolean. Controller of mechanism for dropout.
-    num_heads: An int. Number of heads.
-    scope: Optional scope for `variable_scope`.
-    reuse: Boolean, whether to reuse the weights of a previous layer
-    by the same name.
-
-  Returns
-    A 3d tensor with shape of (N, T_q, C)
-  '''
-  with tf.variable_scope(scope, reuse=reuse):
-    num_units = queries.get_shape().as_list()[-1]
-
-    # queries ----> dense(relu) ----> Q
-    #
-    # keys    --+-> dense(relu) ----> K
-    #           |
-    #           +-> dense(relu) ----> V
-    # Linear projections, C = # dim or column, T_x = # vectors or actions
-    Q = tf.layers.dense(queries, num_units, activation=tf.nn.relu)  # (N, T_q, C)
-    K = tf.layers.dense(keys, num_units, activation=tf.nn.relu)  # (N, T_k, C)
-    V = tf.layers.dense(keys, num_units, activation=tf.nn.relu)  # (N, T_k, C)
-
-    # ヘッドで分割
-    # Split and concat
-    Q_ = tf.concat(tf.split(Q, num_heads, axis=2), axis=0)  # (h*N, T_q, C/h)
-    K_ = tf.concat(tf.split(K, num_heads, axis=2), axis=0)  # (h*N, T_k, C/h)
-    V_ = tf.concat(tf.split(V, num_heads, axis=2), axis=0)  # (h*N, T_k, C/h)
-
-    # アテンションスコアの算出（QK^T）
-    # Multiplication
-    # query-key score matrix
-    # each big score matrix is then split into h score matrix with same size
-    # w.r.t. different part of the feature
-    outputs = tf.matmul(Q_, tf.transpose(K_, [0, 2, 1]))  # (h*N, T_q, T_k)
-
-    # sqrt(C/h)で割る
-    # Scale
-    outputs = outputs / (K_.get_shape().as_list()[-1] ** 0.5)
-
-    # Key Masking
-    # keysは可変の長さを持つ(keys_lengthで定義)、値のある要素だけを示すマスクを生成する
-    key_masks = tf.sequence_mask(keys_length, tf.shape(keys)[1])   # (N, T_k)
-    # ヘッドの数だけ複製する
-    key_masks = tf.tile(key_masks, [num_heads, 1])  # (h*N, T_k)
-    # クエリの数だけマスクを複製
-    key_masks = tf.tile(tf.expand_dims(key_masks, 1), [1, tf.shape(queries)[1], 1])  # (h*N, T_q, T_k)
-
-    # -2^32+1は無限大として考える、outputsと同じ形を持つすべての要素が無限大の行列paddingsを作る
-    paddings = tf.ones_like(outputs) * (-2 ** 32 + 1)
-    # outputsにマスクを適用する、key_masksがTrueの要素はoutputsで、Falseはpaddingsで塗りつぶす
-    outputs = tf.where(key_masks, outputs, paddings)  # (h*N, T_q, T_k)
-
-    # 文章のトランスフォーマーとは違い、予測に必要な以外の将来の行動をマスクする必要はないので実装していない
-    # Causality = Future blinding: No use, removed
-
-    # 最後の次元、T_kのaxisでsoftmaxが実行される
-    # Activation
-    outputs = tf.nn.softmax(outputs)  # (h*N, T_q, T_k)
-
-    # keysのマスキングは行ったが、queryのマスキングは行っていないので行う
-    # Query Masking
-    query_masks = tf.sequence_mask(queries_length, tf.shape(queries)[1], dtype=tf.float32)   # (N, T_q)
-    query_masks = tf.tile(query_masks, [num_heads, 1])  # (h*N, T_q)
-    query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1, 1, tf.shape(keys)[1]])  # (h*N, T_q, T_k)
-    outputs *= query_masks  # broadcasting. (h*N, T_q, T_k)
-
-    # Attention vector
-    att_vec = outputs
-
-    # Dropouts
-    outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
-
-    # Weighted sum
-    outputs = tf.matmul(outputs, V_)  # ( h*N, T_q, C/h)
-
-    # Restore shape
-    outputs = tf.concat(tf.split(outputs, num_heads, axis=0), axis=2)  # (N, T_q, C)
-
-    # Residual connection
-    outputs += queries
-
-    # Normalize
-    outputs = normalize(outputs)  # (N, T_q, C)
-
-    ## Feed Forward
-    outputs = feedforward(outputs, num_units=[num_units // 4, num_units], reuse=reuse)
-
-  return outputs, att_vec
 
 def feedforward(inputs,
         num_units=[2048, 512],
