@@ -268,7 +268,7 @@ class Model(object):
         self.r: uij[7],
         self.is_training: False,
         })
-    res2, eatt_2, datt_2 = sess.run([self.eval_logits, self.enc_att, self.dec_att], feed_dict={
+    res2, datt_2 = sess.run([self.eval_logits, self.dec_att], feed_dict={
         self.u: uij[0],
         self.i: uij[2],
         self.hist_i: uij[3],
@@ -278,7 +278,7 @@ class Model(object):
         self.r: uij[7],
         self.is_training: False,
         })
-    return res1, res2, eatt_1, datt_1, eatt_2, datt_2
+    return res1, res2, eatt_1, datt_1, datt_2
 
 
      
