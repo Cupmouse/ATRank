@@ -314,7 +314,7 @@ def transformer(enc, sl, dec, enc_blocks, dec_blocks, dropout_rate, is_training,
         with tf.variable_scope("block_{}".format(i)):
           # セルフマルチヘッドアテンション
           ### Multihead Attention
-          # enc [B, Tq, C]*M
+          # enc [B, Tq, M, C]
           enc, enc_att = modal_head_attention(queries=enc,
               queries_length=sl,
               keys=enc,
@@ -327,7 +327,7 @@ def transformer(enc, sl, dec, enc_blocks, dec_blocks, dropout_rate, is_training,
       for i in range(dec_blocks):
         with tf.variable_scope("block_{}".format(i)):
           # decを使ってencにアテンション
-          # dec [B, 1, C]*M
+          # dec [B, 1, M, C]
           dec, dec_att = modal_head_attention(queries=dec,
               queries_length=tf.ones(tf.shape(dec)[0], dtype=tf.int32),
               keys=enc,
@@ -335,7 +335,7 @@ def transformer(enc, sl, dec, enc_blocks, dec_blocks, dropout_rate, is_training,
               dropout_rate=dropout_rate,
               is_training=is_training)
 
-    dec = tf.squeeze(dec)
+    dec = tf.reshape(dec, (tf.shape(dec)[0], tf.shape(dec)[2], tf.shape(dec)[3]))
 
     return dec, enc_att, dec_att
 
