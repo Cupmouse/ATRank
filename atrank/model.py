@@ -496,7 +496,7 @@ def modal_head_attention(queries,
     outputs = tf.layers.dropout(att, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
 
     # Weighted sum
-    outputs = tf.einsum('bqni,bqmkn->bqmi', V, outputs) # (N, T_q, M, C)
+    outputs = tf.einsum('bkni,bqmkn->bqmi', V, outputs) # (N, T_q, M, C)
     
     # Residual connection
     outputs += queries
