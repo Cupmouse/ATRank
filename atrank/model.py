@@ -91,7 +91,7 @@ class Model(object):
     # アイテム埋め込みとカテゴリ埋め込みと時間の埋め込みを結合、それをDenseで写像する
     # 論文：p3左のu_ij=h_emb
     # 予測すべきアイテムの埋め込み表現 [B, 2d]
-    i_emb = tf.concat([
+    self.i_emb = tf.concat([
         tf.nn.embedding_lookup(item_emb_w, self.i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.i)),
         ], 1)
@@ -100,23 +100,18 @@ class Model(object):
 
     # embedding_lookupでルックアップテーブルから該当する埋め込み表現を持ってくる
     item_emb = tf.nn.embedding_lookup(item_emb_w, self.hist_i) # [B, T, d]
-    item_emb = tf.expand_dims(item_emb, 2) # [B, T, 1, d]
     
     cat_emb = tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)) # [B, T, d]
-    cat_emb = tf.expand_dims(cat_emb, 2) # [B, T, 1, d]
 
     img_emb = tf.layers.dense(self.im, modal_emb_size, activation=tf.nn.relu) # [B, T, d]
     img_emb = tf.layers.dropout(img_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
-    img_emb = tf.expand_dims(img_emb, 2) # [B, T, 1, d]
 
     text_emb = tf.layers.dense(self.r, modal_emb_size, activation=tf.nn.relu) # [B, T, d]
-    text_emb = tf.expand_dims(text_emb, 2) # [B, T, 1, d]
 
     t_emb = tf.nn.embedding_lookup(time_emb_w, self.hist_t) # [B, T, d]
-    t_emb = tf.expand_dims(t_emb, 2) # [B, T, 1, d]
 
     # [B, T, M, d]
-    h_emb = tf.concat((item_emb, cat_emb, img_emb, text_emb, t_emb), axis=2)
+    self.h_emb = tf.stack((item_emb, cat_emb, img_emb, text_emb, t_emb), axis=2)
 
     # アテンション機構を重ねる数
     num_blocks = self.config['num_blocks']
@@ -125,13 +120,13 @@ class Model(object):
     # トランスフォーマー
     # 論文：p4左数式(3)
     # u_emb [B, C]
-    u_emb, self.att, self.stt = transformer(
+    self.u_emb, self.enc_att, self.dec_att = transformer(
         # uij
-        h_emb,
+        self.h_emb,
         # ユーザーの履歴の長さ
         self.sl,
         # デコーダーへの入力
-        i_emb,
+        self.i_emb,
         num_blocks,
         num_blocks,
         num_heads,
@@ -141,7 +136,7 @@ class Model(object):
 
     # 予測
     # 論文：p4右数式(7)&(8) f(h_t, et_u) reduce_sum([B, C]) [B]
-    self.logits = i_b + tf.reduce_sum(tf.multiply(u_emb, i_emb), 1)
+    self.logits = i_b + tf.reduce_sum(tf.multiply(self.u_emb, self.i_emb), 1)
 
     # ============== Eval ===============
     self.eval_logits = self.logits
@@ -156,10 +151,9 @@ class Model(object):
     # Loss
     # L2正規化
     l2_norm = tf.add_n([
-        tf.nn.l2_loss(u_emb),
-        tf.nn.l2_loss(i_emb),
-        tf.nn.l2_loss(t_emb),
-        ])
+        tf.nn.l2_loss(self.u_emb),
+        tf.nn.l2_loss(self.i_emb),
+      ])
 
     # ロス定義、ペアワイズ、シグモイド相互情報量
     self.loss = tf.reduce_mean(
@@ -169,15 +163,16 @@ class Model(object):
         ) + self.config['regulation_rate'] * l2_norm
 
     self.train_summary = tf.summary.merge([
-        tf.summary.histogram('embedding/1_item_emb', item_emb_w),
-        tf.summary.histogram('embedding/2_cate_emb', cate_emb_w),
-        tf.summary.histogram('embedding/3_time_raw', self.hist_t),
-        tf.summary.histogram('embedding/3_time_dense', t_emb),
-        tf.summary.histogram('embedding/4_final', h_emb),
-        tf.summary.histogram('attention_output', u_emb),
+        tf.summary.histogram('embedding/item_emb', item_emb_w),
+        tf.summary.histogram('embedding/cate_emb', cate_emb_w),
+        tf.summary.histogram('embedding/time_emb', time_emb_w),
+        tf.summary.histogram('encoder/input', self.h_emb),
+        tf.summary.histogram('encoder/attention', self.enc_att),
+        tf.summary.histogram('decoder/output', self.u_emb),
+        tf.summary.histogram('decoder/attention', self.dec_att),
         tf.summary.scalar('L2_norm Loss', l2_norm),
         tf.summary.scalar('Training Loss', self.loss),
-        ])
+      ])
 
 
   def init_optimizer(self):
@@ -263,7 +258,7 @@ class Model(object):
 
   def test(self, sess, uij):
     """uijを使ってテスト用の結果を生成"""
-    res1, att_1, stt_1 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
+    res1, eatt_1, datt_1 = sess.run([self.eval_logits, self.enc_att, self.dec_att], feed_dict={
         self.u: uij[0],
         self.i: uij[1],
         self.hist_i: uij[3],
@@ -273,7 +268,7 @@ class Model(object):
         self.r: uij[7],
         self.is_training: False,
         })
-    res2, att_2, stt_2 = sess.run([self.eval_logits, self.att, self.stt], feed_dict={
+    res2, eatt_2, datt_2 = sess.run([self.eval_logits, self.enc_att, self.dec_att], feed_dict={
         self.u: uij[0],
         self.i: uij[2],
         self.hist_i: uij[3],
@@ -283,7 +278,7 @@ class Model(object):
         self.r: uij[7],
         self.is_training: False,
         })
-    return res1, res2, att_1, stt_1, att_2, stt_1
+    return res1, res2, eatt_1, datt_1, eatt_2, datt_2
 
 
      
@@ -319,7 +314,7 @@ def transformer(enc, sl, dec, enc_blocks, dec_blocks, dec_heads, dropout_rate, i
           # セルフマルチヘッドアテンション
           ### Multihead Attention
           # enc [B, Tq, M, C]
-          enc, stt_vec = modal_head_attention(queries=enc,
+          enc, enc_att = modal_head_attention(queries=enc,
               queries_length=sl,
               keys=enc,
               keys_length=sl,
@@ -337,7 +332,7 @@ def transformer(enc, sl, dec, enc_blocks, dec_blocks, dec_heads, dropout_rate, i
           ## Multihead Attention ( vanilla attention)
           # decを使ってencにアテンション
           # dec [B, 1, C]
-          dec, att_vec = multihead_attention(queries=dec,
+          dec, dec_att = multihead_attention(queries=dec,
               queries_length=tf.ones_like(dec[:, 0, 0], dtype=tf.int32),
               keys=enc,
               keys_length=sl,
@@ -348,7 +343,7 @@ def transformer(enc, sl, dec, enc_blocks, dec_blocks, dec_heads, dropout_rate, i
 
     # [B, C]
     dec = tf.squeeze(dec)
-    return dec, att_vec, stt_vec
+    return dec, enc_att, dec_att
 
 
 def modal_dense(input_tensor,
