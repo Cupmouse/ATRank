@@ -374,41 +374,6 @@ def modal_dense(input_tensor,
     return output
 
 
-def leave_one_dense(input_tensor,
-            num_units,
-            activation=None,
-            scope='leave_one_dense',
-            reuse=None):
-  """各モーダルに対して、それ以外のモーダルをDenseに通します。
-  例：M=3 (Ma, Mb, Mc)
-  output = [dense(input[Mb]⊕input[Mc]), dense(input[Ma]⊕input[Mc]), dense(input[Ma]⊕input[Mb])]
-
-  Args:
-    input_tensor: [N, T, M, C]の形をした4次元入力のテンソルです。
-    scope: スコープ。
-    num_units: 出力のベクトルサイズ。
-    reuse: 重みを再利用するかどうか。
-  """
-  with tf.variable_scope(scope, reuse=reuse):
-    batch_size = tf.shape(input_tensor)[0]
-    series_size = tf.shape(input_tensor)[1]
-    s = input_tensor.get_shape().as_list()
-    vector_size = s[-1]
-    modality = s[-2]
-    
-    # [N, T, M-1, C]*M
-    output = [tf.stack([input_tensor[:, :, j] for j in range(modality) if i != j], 2) for i in range(modality)]
-    output = tf.stack(output, 2) # [N, T, M, M-1, C]
-
-    # [N, T, M, (M-1)*C]
-    output = tf.reshape(output, (batch_size, series_size, modality, (modality-1)*vector_size))
-
-    # [N, T, M, O]
-    output = modal_dense(output, num_units, activation=activation, reuse=reuse)
-
-    return output
-
-
 def modal_head_attention(queries,
             queries_length,
             keys,
@@ -441,15 +406,15 @@ def modal_head_attention(queries,
     q_modality = q_shape[-2]
     k_modality = keys.get_shape().as_list()[-2]
 
-    # queries ----> leave-one-dense(relu) ----> Q
+    # queries ----> modal_dense(relu) ----> Q
     #
     # keys    --+-> modal-dense(relu)     ----> K
     #           |
     #           +-> modal-dense(relu)     ----> V
     # Linear projections, C = # dim or column, T_x = # vectors or actions
     Q = modal_dense(queries, num_units, activation=tf.nn.relu, scope='query_dense', reuse=reuse)  # (N, T_q, M, C)
-    K = leave_one_dense(keys, num_units, activation=tf.nn.relu, scope='key_dense', reuse=reuse)  # (N, T_k, M, C)
-    V = leave_one_dense(keys, num_units, activation=tf.nn.relu, scope='value_dense', reuse=reuse)  # (N, T_k, M, C)
+    K = modal_dense(keys, num_units, activation=tf.nn.relu, scope='key_dense', reuse=reuse)  # (N, T_k, M, C)
+    V = modal_dense(keys, num_units, activation=tf.nn.relu, scope='value_dense', reuse=reuse)  # (N, T_k, M, C)
 
     # アテンションスコアの算出
     # Multiplication
