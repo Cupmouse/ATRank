@@ -22,7 +22,6 @@ tf.set_random_seed(1234)
 
 # pylint: disable=line-too-long
 # Network parameters
-tf.app.flags.DEFINE_integer('hidden_units', 128, 'Number of hidden units in each layer')
 tf.app.flags.DEFINE_integer('enc_blocks', 1, 'Number of attention blocks in encoder')
 tf.app.flags.DEFINE_integer('dec_blocks', 1, 'Number of attention blocks in decoder')
 tf.app.flags.DEFINE_float('dropout', 0.0, 'Dropout probability(0.0: no dropout)')
@@ -38,8 +37,8 @@ tf.app.flags.DEFINE_boolean('from_scratch', True, 'Remove model_dir, and train f
 tf.app.flags.DEFINE_string('model_dir', 'save_path', 'Path to save model checkpoints')
 tf.app.flags.DEFINE_string('optimizer', 'sgd', 'Optimizer for training: (adadelta, adam, rmsprop,sgd*)')
 tf.app.flags.DEFINE_float('lr', 1.0, 'Learning rate')
-tf.app.flags.DEFINE_integer('lr_lowered_step', 310000, 'Global step from it lower learning rate')
-tf.app.flags.DEFINE_float('lr_lowered', 0.1, 'Learning rate when global step reached lr_lowered_step')
+tf.app.flags.DEFINE_integer('lr_lower_step', 310000, 'Global step from it lower learning rate')
+tf.app.flags.DEFINE_float('lr_lower', 0.1, 'Learning rate when global step reached lr_lowered_step')
 tf.app.flags.DEFINE_float('max_gradient_norm', 5.0, 'Clip gradients to this norm')
 
 tf.app.flags.DEFINE_integer('train_batch_size', 32, 'Training Batch size')
