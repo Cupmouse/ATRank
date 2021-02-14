@@ -23,8 +23,8 @@ tf.set_random_seed(1234)
 # pylint: disable=line-too-long
 # Network parameters
 tf.app.flags.DEFINE_integer('hidden_units', 128, 'Number of hidden units in each layer')
-tf.app.flags.DEFINE_integer('num_blocks', 1, 'Number of blocks in each attention')
-tf.app.flags.DEFINE_integer('num_heads', 8, 'Number of heads in each attention')
+tf.app.flags.DEFINE_integer('enc_blocks', 1, 'Number of attention blocks in encoder')
+tf.app.flags.DEFINE_integer('dec_blocks', 1, 'Number of attention blocks in decoder')
 tf.app.flags.DEFINE_float('dropout', 0.0, 'Dropout probability(0.0: no dropout)')
 tf.app.flags.DEFINE_float('regulation_rate', 0.00005, 'L2 regulation rate')
 
@@ -34,10 +34,12 @@ tf.app.flags.DEFINE_integer('modal_embedding_size', 64, 'Embedding size of each 
 tf.app.flags.DEFINE_integer('time_gap_categoized', 12, 'Number of categories of time gaps splitted into')
 
 # Training parameters
-tf.app.flags.DEFINE_boolean('from_scratch', True, 'Romove model_dir, and train from scratch, default: False')
+tf.app.flags.DEFINE_boolean('from_scratch', True, 'Remove model_dir, and train from scratch, default: False')
 tf.app.flags.DEFINE_string('model_dir', 'save_path', 'Path to save model checkpoints')
 tf.app.flags.DEFINE_string('optimizer', 'sgd', 'Optimizer for training: (adadelta, adam, rmsprop,sgd*)')
-tf.app.flags.DEFINE_float('learning_rate', 1.0, 'Learning rate')
+tf.app.flags.DEFINE_float('lr', 1.0, 'Learning rate')
+tf.app.flags.DEFINE_integer('lr_lowered_step', 310000, 'Global step from it lower learning rate')
+tf.app.flags.DEFINE_float('lr_lowered', 0.1, 'Learning rate when global step reached lr_lowered_step')
 tf.app.flags.DEFINE_float('max_gradient_norm', 5.0, 'Clip gradients to this norm')
 
 tf.app.flags.DEFINE_integer('train_batch_size', 32, 'Training Batch size')
@@ -175,12 +177,12 @@ def train():
                 flush=True)
           avg_loss = 0.0
 
-          if test_auc > 0.88 and test_auc > best_auc:
+          if test_auc > 0.87 and test_auc > best_auc:
             best_auc = test_auc
             model.save(sess)
 
-        if model.global_step.eval() == 336000:
-          lr = 0.1
+        if model.global_step.eval() == FLAGS.lr_lower_step:
+          lr = FLAGS.lr_lower
 
       print('Epoch %d DONE\tCost time: %.2f' %
             (model.global_epoch_step.eval(), time.time()-start_time),

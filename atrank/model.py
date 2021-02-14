@@ -113,9 +113,6 @@ class Model(object):
     # [B, T, M, d]
     self.h_emb = tf.stack((item_emb, cat_emb, img_emb, text_emb, t_emb), axis=2)
 
-    # アテンション機構を重ねる数
-    num_blocks = self.config['num_blocks']
-
     # トランスフォーマー
     # 論文：p4左数式(3)
     # u_emb [B, M, C]
@@ -126,8 +123,8 @@ class Model(object):
         self.sl,
         # デコーダーへの入力
         self.i_emb,
-        num_blocks,
-        num_blocks,
+        self.config['enc_blocks'],
+        self.config['dec_blocks'],
         dropout_rate,
         self.is_training,
         False)
