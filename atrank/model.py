@@ -8,18 +8,18 @@ import tensorflow.compat.v1 as tf
 class Model(object):
   """モデルのクラスを定義"""
 
-  def __init__(self, config, cate_list):
+  def __init__(self, config, cate_list, sess):
     """config：設定、cate_list：商品のカテゴリ（ASINのID順）"""
     self.config = config
-
-    # Summary Writer
-    self.train_writer = tf.summary.FileWriter(config['model_dir'] + '/train')
-    self.eval_writer = tf.summary.FileWriter(config['model_dir'] + '/eval')
 
     # Building network
     self.init_placeholders()
     self.build_model(cate_list)
     self.init_optimizer()
+    
+    # Summary Writer
+    self.train_writer = tf.summary.FileWriter(config['model_dir'] + '/train', graph=sess.graph)
+    self.eval_writer = tf.summary.FileWriter(config['model_dir'] + '/eval', graph=sess.graph)
 
 
   def init_placeholders(self):

@@ -60,7 +60,7 @@ def create_model(sess, config, cate_list):
   """モデルを読み込む"""
 
   print(json.dumps(config, indent=4), flush=True)
-  model = Model(config, cate_list)
+  model = Model(config, cate_list, sess)
 
   print('All global variables:')
   for v in tf.global_variables():
@@ -151,7 +151,7 @@ def train():
     print('Init AUC: %.4f' % _eval(sess, test_set, model, images, img_list, texts))
 
     # Start training
-    lr = FLAGS.learning_rate
+    lr = FLAGS.lr
     epoch_size = round(len(train_set) / FLAGS.train_batch_size)
     print('Training..\tmax_epochs: %d\tepoch_size: %d' %
           (FLAGS.max_epochs, epoch_size), flush=True)
