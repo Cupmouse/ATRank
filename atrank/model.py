@@ -125,6 +125,7 @@ class Model(object):
         self.i_emb,
         self.config['enc_blocks'],
         self.config['dec_blocks'],
+        self.config['pe_max_len'],
         dropout_rate,
         self.is_training,
         False)
@@ -319,7 +320,7 @@ def positional_encoding(tens, maxlen, scope='pe', reuse=None):
     return tf.to_float(outputs)
 
 
-def transformer(enc, maxlen, sl, dec, enc_blocks, dec_blocks, dropout_rate, is_training, reuse):
+def transformer(enc, sl, dec, enc_blocks, dec_blocks, pe_maxlen, dropout_rate, is_training, reuse):
   """
   トランスフォーマー
   論文：p4 Self-Attention Layer
@@ -328,7 +329,7 @@ def transformer(enc, maxlen, sl, dec, enc_blocks, dec_blocks, dropout_rate, is_t
   dec：デコーダーへの入力 [B, di+da]
   """
 
-  enc = tf.stack([positional_encoding(m, maxlen) for m in tf.unstack(enc, axis=2)], axis=2)
+  enc = tf.stack([positional_encoding(m, pe_maxlen) for m in tf.unstack(enc, axis=2)], axis=2)
 
   # dec [B, 1, M, C]
   dec = tf.expand_dims(dec, 1)

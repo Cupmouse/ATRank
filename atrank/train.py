@@ -22,6 +22,7 @@ tf.set_random_seed(1234)
 
 # pylint: disable=line-too-long
 # Network parameters
+tf.app.flags.DEFINE_integer('pe_maxlen', 1, 'Maximum length of Positional Encoding')
 tf.app.flags.DEFINE_integer('enc_blocks', 1, 'Number of attention blocks in encoder')
 tf.app.flags.DEFINE_integer('dec_blocks', 1, 'Number of attention blocks in decoder')
 tf.app.flags.DEFINE_float('dropout', 0.0, 'Dropout probability(0.0: no dropout)')
