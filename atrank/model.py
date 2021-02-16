@@ -125,7 +125,7 @@ class Model(object):
         self.i_emb,
         self.config['enc_blocks'],
         self.config['dec_blocks'],
-        self.config['pe_max_len'],
+        self.config['pe_maxlen'],
         dropout_rate,
         self.is_training,
         False)
