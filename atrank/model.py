@@ -420,6 +420,9 @@ def modal_head_attention(queries,
     # w.r.t. different part of the feature
     att = tf.einsum('bqmi,bkni->bqmkn', Q, K) # (N, T_q, M, T_k, M)
     
+    # sqrt(C)で割る
+    att = att / (num_units ** 0.5)
+
     # Key Masking
     # keysは可変の長さを持つ(keys_lengthで定義)、値のある要素だけを示すマスクを生成する
     key_masks = tf.sequence_mask(keys_length, tf.shape(keys)[1])   # (N, T_k)
