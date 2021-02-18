@@ -1,7 +1,7 @@
 import os
 import time
 import json
-import pickle
+import pickle5 as pickle
 import random
 from collections import OrderedDict
 
