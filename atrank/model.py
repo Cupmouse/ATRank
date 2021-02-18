@@ -425,6 +425,7 @@ def modal_head_attention(queries,
     ckl = tf.expand_dims(ckl, 1) # (N, 1)
     ckl = tf.expand_dims(ckl, 2) # (N, 1, 1)
     ckl = tf.expand_dims(ckl, 3) # (N, 1, 1, 1)
+    ckl = tf.expand_dims(ckl, 4) # (N, 1, 1, 1, 1)
     ckl = tf.tile(ckl, [1, tf.shape(queries)[1], q_modality, tf.shape(keys)[1], k_modality]) # (N, Tq, Mq, Tk, M)
 
     att /= ckl
