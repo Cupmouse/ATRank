@@ -31,7 +31,7 @@ tf.app.flags.DEFINE_float('regulation_rate', 0.00005, 'L2 regulation rate')
 tf.app.flags.DEFINE_integer('input_image_emb_size', 64, 'Image input embedding size')
 tf.app.flags.DEFINE_integer('input_text_emb_size', 300, 'Text input embedding size')
 tf.app.flags.DEFINE_integer('modal_embedding_size', 64, 'Embedding size of each modal')
-tf.app.flags.DEFINE_integer('time_gap_categoized', 12, 'Number of categories of time gaps splitted into')
+tf.app.flags.DEFINE_integer('time_gap_categoized', 13, 'Number of categories of time gaps splitted into')
 
 # Training parameters
 tf.app.flags.DEFINE_boolean('from_scratch', True, 'Remove model_dir, and train from scratch, default: False')
