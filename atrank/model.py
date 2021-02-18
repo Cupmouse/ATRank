@@ -421,7 +421,13 @@ def modal_head_attention(queries,
     att = tf.einsum('bqmi,bkni->bqmkn', Q, K) # (N, T_q, M, T_k, M)
     
     # sqrt(C*kl)で割る
-    att = tf.stack([m / ((num_units*keys_length[i]) ** 0.5) for i, m in enumerate(tf.unstack(att, axis=-2))], axis=-2)
+    ckl = (num_units*keys_length) ** 0.5 # (N)
+    ckl = tf.expand_dims(ckl, 1) # (N, 1)
+    ckl = tf.expand_dims(ckl, 2) # (N, 1, 1)
+    ckl = tf.expand_dims(ckl, 3) # (N, 1, 1, 1)
+    ckl = tf.tile(ckl, [1, tf.shape(queries)[1], q_modality, tf.shape(keys)[1], k_modality]) # (N, Tq, Mq, Tk, M)
+
+    att /= ckl
 
     # Key Masking
     # keysは可変の長さを持つ(keys_lengthで定義)、値のある要素だけを示すマスクを生成する
