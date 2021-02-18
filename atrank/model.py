@@ -333,6 +333,7 @@ def transformer(enc, sl, dec, enc_blocks, dec_blocks, pe_maxlen, dropout_rate, i
 
   # dec [B, 1, M, C]
   dec = tf.expand_dims(dec, 1)
+  dec = tf.stack([positional_encoding(m, pe_maxlen) for m in tf.unstack(dec, axis=2)], axis=2)
 
   with tf.variable_scope("all", reuse=reuse):
     with tf.variable_scope("encoder"):
