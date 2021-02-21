@@ -91,7 +91,6 @@ class Model(object):
         (self.config['time_gap_categoized'], modal_emb_size))
 
     img_dense = tf.layers.Dense(modal_emb_size, activation=tf.nn.relu, name='image_dense')
-    img_dense = tf.layers.Dropout(img_dense, name='image_dropout')
 
     # アイテム埋め込みとカテゴリ埋め込みと時間の埋め込みを結合
     # 論文：p3左のu_ij=h_emb
@@ -99,7 +98,7 @@ class Model(object):
     self.i_emb = tf.stack([
         tf.nn.embedding_lookup(item_emb_w, self.i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.i)),
-        img_dense(self.i_im),
+        tf.layers.dropout(img_dense(self.i_im), rate=dropout_rate, training=tf.convert_to_tensor(self.is_training)),
       ], 1)
     # 予測すべきアイテムの重み [B]
     i_b = tf.gather(item_b, self.i)
@@ -110,6 +109,7 @@ class Model(object):
     cat_emb = tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)) # [B, T, d]
 
     img_emb = img_dense(self.im)
+    img_emb = tf.layers.dropout(img_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
 
     text_emb = tf.layers.dense(self.r, modal_emb_size, activation=tf.nn.relu) # [B, T, d]
 
