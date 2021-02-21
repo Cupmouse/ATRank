@@ -45,6 +45,8 @@ class Model(object):
 
     self.im = tf.placeholder(tf.float32, [None, None, self.config['input_image_emb_size']])
 
+    self.i_im = tf.placeholder(tf.float32, [None, self.config['input_image_emb_size']])
+
     self.r = tf.placeholder(tf.float32, [None, None, self.config['input_text_emb_size']])
 
     # [B] valid length of `hist_i`
@@ -88,12 +90,16 @@ class Model(object):
         "time_emb_w",
         (self.config['time_gap_categoized'], modal_emb_size))
 
-    # アイテム埋め込みとカテゴリ埋め込みと時間の埋め込みを結合、それをDenseで写像する
+    img_dense = tf.layers.Dense(modal_emb_size, activation=tf.nn.relu, name='image_dense')
+    img_dense = tf.layers.Dropout(img_dense, name='image_dropout')
+
+    # アイテム埋め込みとカテゴリ埋め込みと時間の埋め込みを結合
     # 論文：p3左のu_ij=h_emb
     # 予測すべきアイテムの埋め込み表現 [B, M, C]
     self.i_emb = tf.stack([
         tf.nn.embedding_lookup(item_emb_w, self.i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.i)),
+        img_dense(self.i_im),
       ], 1)
     # 予測すべきアイテムの重み [B]
     i_b = tf.gather(item_b, self.i)
@@ -103,8 +109,7 @@ class Model(object):
     
     cat_emb = tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.hist_i)) # [B, T, d]
 
-    img_emb = tf.layers.dense(self.im, modal_emb_size, activation=tf.nn.relu) # [B, T, d]
-    img_emb = tf.layers.dropout(img_emb, rate=dropout_rate, training=tf.convert_to_tensor(self.is_training))
+    img_emb = img_dense(self.im)
 
     text_emb = tf.layers.dense(self.r, modal_emb_size, activation=tf.nn.relu) # [B, T, d]
 
@@ -200,7 +205,7 @@ class Model(object):
   def train(self, sess, uij, l, add_summary=False):
     """行動とラベルを入力して学習する"""
 
-    # uij = (u, i, j, hist_i, hist_t, sl, im, r)
+    # uij = (u, i, j, hist_i, hist_t, sl, im, r, im_i, im_j)
     input_feed = {
         self.u: uij[0],
         self.i: uij[1],
@@ -210,6 +215,7 @@ class Model(object):
         self.sl: uij[5],
         self.im: uij[6],
         self.r: uij[7],
+        self.i_im: uij[8],
         self.lr: l,
         self.is_training: True,
         }
@@ -237,6 +243,7 @@ class Model(object):
         self.sl: uij[5],
         self.im: uij[6],
         self.r: uij[7],
+        self.i_im: uij[8],
         self.is_training: False,
         })
     res2 = sess.run(self.eval_logits, feed_dict={
@@ -247,6 +254,7 @@ class Model(object):
         self.sl: uij[5],
         self.im: uij[6],
         self.r: uij[7],
+        self.i_im: uij[9],
         self.is_training: False,
         })
     return np.mean(res1 - res2 > 0)
@@ -261,6 +269,7 @@ class Model(object):
         self.sl: uij[5],
         self.im: uij[6],
         self.r: uij[7],
+        self.i_im: uij[8],
         self.is_training: False,
         })
     res2, datt_2 = sess.run([self.eval_logits, self.dec_att], feed_dict={
@@ -271,6 +280,7 @@ class Model(object):
         self.sl: uij[5],
         self.im: uij[6],
         self.r: uij[7],
+        self.i_im: uij[9],
         self.is_training: False,
         })
     return res1, res2, eatt_1, datt_1, datt_2
