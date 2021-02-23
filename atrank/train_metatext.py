@@ -9,7 +9,7 @@ import numpy as np
 # TensorFlow v1との互換性の維持
 import tensorflow.compat.v1 as tf
 
-from input import DataInput, DataInputTest
+from input_metatext import DataInput, DataInputTest
 from model import Model
 
 # ランダムシードの設定
@@ -82,11 +82,11 @@ def create_model(sess, config, cate_list):
 
   return model
 
-def _eval(sess, test_set, model, imgs, img_list, texts):
+def _eval(sess, test_set, model, imgs, img_list, texts, txt_list):
   """評価を行う"""
 
   auc_sum = 0.0
-  for _, uij in DataInputTest(test_set, FLAGS.test_batch_size, imgs, img_list, texts):
+  for _, uij in DataInputTest(test_set, FLAGS.test_batch_size, imgs, img_list, texts, txt_list):
     auc_sum += model.eval(sess, uij) * len(uij[0])
   test_auc = auc_sum / len(test_set)
 
@@ -110,7 +110,7 @@ def train():
 
   # Loading data
   print('Loading data..', flush=True)
-  with open('dataset.pkl', 'rb') as f:
+  with open('meta_dataset.pkl', 'rb') as f:
     train_set = pickle.load(f)
     test_set = pickle.load(f)
     cate_list = pickle.load(f)

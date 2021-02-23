@@ -31,7 +31,7 @@ tf.app.flags.DEFINE_float('regulation_rate', 0.00005, 'L2 regulation rate')
 tf.app.flags.DEFINE_integer('itemid_embedding_size', 64, 'Item id embedding size')
 tf.app.flags.DEFINE_integer('cateid_embedding_size', 64, 'Cate id embedding size')
 tf.app.flags.DEFINE_integer('input_image_emb_size', 64, 'Image input embedding size')
-tf.app.flags.DEFINE_integer('input_text_emb_size', 300, 'Text input embedding size')
+tf.app.flags.DEFINE_integer('input_text_emb_size', 1024, 'Text input embedding size')
 
 tf.app.flags.DEFINE_boolean('concat_time_emb', True, 'Concat time-embedding instead of Add')
 
@@ -47,7 +47,7 @@ tf.app.flags.DEFINE_integer('test_batch_size', 128, 'Testing Batch size')
 tf.app.flags.DEFINE_integer('max_epochs', 10, 'Maximum # of training epochs')
 
 tf.app.flags.DEFINE_integer('display_freq', 100, 'Display training status every this iteration')
-tf.app.flags.DEFINE_integer('eval_freq', 10000, 'Display training status every this iteration')
+tf.app.flags.DEFINE_integer('eval_freq', 1000, 'Display training status every this iteration')
 
 # Runtime parameters
 tf.app.flags.DEFINE_string('cuda_visible_devices', '0', 'Choice which GPU to use')
@@ -110,13 +110,13 @@ def train():
 
   # Loading data
   print('Loading data..', flush=True)
-  with open('dataset.pkl', 'rb') as f:
+  with open('small_dataset.pkl', 'rb') as f:
     train_set = pickle.load(f)
     test_set = pickle.load(f)
     cate_list = pickle.load(f)
     user_count, item_count, cate_count = pickle.load(f)
     img_list, images = pickle.load(f)
-    texts = pickle.load(f)
+    _, texts = pickle.load(f)
 
   # Config GPU options
   if FLAGS.per_process_gpu_memory_fraction == 0.0:

@@ -1,4 +1,4 @@
-"""word2vecを利用して文章を変換する"""
+"""FastTextを利用して文章を変換する"""
 #文の前処理を入れる
 #nltkによる分かち書き、ステミング、ストップワード除去
 
@@ -12,23 +12,22 @@ import re
 import gensim
 import tensorflow as tf
 import tensorflow_hub as hub
-import pandas as pd
+import time
 
+with open('../raw_data/small_remap.pkl', 'rb') as f:
+  pickle.load(f)
+  pickle.load(f)
+  pickle.load(f)
+  pickle.load(f)
+  pickle.load(f)
+  text_list, text_key = pickle.load(f)
+
+#word2vec = gensim.models.KeyedVectors.load_word2vec_format('../raw_data/GoogleNews-vectors-negative300.bin',binary=True)
+fasttext = FastText.load_fasttext_format('../raw_data/cc.en.300.bin')
 stop_words = set(stopwords.words('english'))
 signals = re.compile('[^a-zA-Z0-9]+')
-word2vec = gensim.models.KeyedVectors.load_word2vec_format('../raw_data/GoogleNews-vectors-negative300.bin',binary=True)
-
-
-with open('../raw_data/remap.pkl', 'rb') as f:
-  pickle.load(f)
-  pickle.load(f)
-  pickle.load(f)
-  pickle.load(f)
-  pickle.load(f)
-  texts = pickle.load(f)
 
 def sec2vec(sentence):
-  sentence = sentence.replace('&#34;', '')
   sentence = signals.sub(' ', sentence)
   global fasttext
   # 文を単語に分ける
@@ -36,16 +35,19 @@ def sec2vec(sentence):
   # ストップワードフィルタリング
   filtered_words = [word for word in words if word not in stop_words]
   # 存在する単語のみ利用
-  words_vectors = [word2vec[word] for word in filtered_words if word in word2vec]
+  words_vectors = [fasttext[word] for word in filtered_words if word in fasttext]
   # 文のベクトルを平均で算出
   if len(words_vectors) == 0:
     return np.zeros((300,), dtype=np.float32)
   return np.mean(words_vectors, axis=0)
 
 # レビュー文をベクトル化
-r = np.ndarray((len(texts), 300), dtype=np.float32)
-for i, sent in enumerate(texts):
+print('len of text_key:' + str(len(text_key)))
+r = np.ndarray((len(text_key), 300), dtype=np.float32)
+for i, sent in enumerate(text_key):
   r[i] = sec2vec(sent)
+  if i % 10000 == 0:
+    print('%.2f%% done (%d/%d)' % ((i / len(text_key))*100, i, len(text_key)))
 
-with open('../raw_data/text_embeddings.pkl', 'wb') as f:
+with open('../raw_data/text_embeddings_fasttext.pkl', 'wb') as f:
   pickle.dump(r, f, pickle.HIGHEST_PROTOCOL)

@@ -1,7 +1,7 @@
 """FastTextを利用して文章を変換する"""
 #文の前処理を入れる
 #nltkによる分かち書き、ステミング、ストップワード除去
-#titleを変換
+#商品説明文を変換
 
 import pickle
 import numpy as np
@@ -18,18 +18,17 @@ stop_words = set(stopwords.words('english'))
 signals = re.compile('[^a-zA-Z0-9]+')
 fasttext = FastText.load_fasttext_format('../raw_data/cc.en.300.bin')
 
-with open('../raw_data/remap.pkl', 'rb') as f:
+with open('../raw_data/remap_meta.pkl', 'rb') as f:
   pickle.load(f)
   pickle.load(f)
   pickle.load(f)
   pickle.load(f)
   pickle.load(f)
-  tit_list, tit_key = pickle.load(f)
+  des_list, des_key = pickle.load(f)
 
 def sec2vec(sentence):
-  sentence = sentence.replace('&#34;', '')
   sentence = signals.sub(' ', sentence)
-  global fasttext
+  #global fasttext
   # 文を単語に分ける
   words = tokenize.word_tokenize(sentence)
   # ストップワードフィルタリング
@@ -42,10 +41,13 @@ def sec2vec(sentence):
   return np.mean(words_vectors, axis=0)
 
 # レビュー文をベクトル化
-r = np.ndarray((len(tit_key), 300), dtype=np.float32)
+r = np.ndarray((len(des_key), 300), dtype=np.float32)
+count_i = 0
 
-for i in range(len(tit_key)):
-  r[i] = sec2vec(tit_key[i])
+for i in range(len(des_key)):
+  r[i] = sec2vec(des_key[i])
+  if i%5000 == 0:
+    print(i)
     
 with open('../raw_data/text_embeddings.pkl', 'wb') as f:
   pickle.dump(r, f, pickle.HIGHEST_PROTOCOL)

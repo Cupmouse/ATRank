@@ -118,7 +118,19 @@ class DataInputTest:
       hist_i[k, :len(hi[k])] = hi[k]
       hist_t[k, :len(ht[k])] = ht[k]
 
+    '''
+    print("hi[0]:" + str(hi[0]))
+    print("txt_list[hi[0]]:")
+    print(self.txt_list[hi[0]])
+    print("i:" + str(i))
+    print("type of i:" + str(type(i)))
+    print("len(i):" + str(len(i)))
+    print("txt_list[i[0]]:")
+    print(self.txt_list[i[0]])
+    print("shape of self.txts[self.txt_list[list(i)]]:" + str(self.txts[self.txt_list[list(i)]].shape))
+    '''
+    
     im = self.imgs[self.img_list[hist_i]]
     r = self.txts[self.txt_list[hist_i]]
-
+    
     return self.i, (u, i, j, hist_i, hist_t, sl, im, r)

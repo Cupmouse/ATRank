@@ -46,6 +46,8 @@ class Model(object):
     self.im = tf.placeholder(tf.float32, [None, None, self.config['input_image_emb_size']])
 
     self.r = tf.placeholder(tf.float32, [None, None, self.config['input_text_emb_size']])
+    
+    self.r_i = tf.placeholder(tf.float32, [None, self.config['input_text_emb_size']])
 
     # [B] valid length of `hist_i`
     self.sl = tf.placeholder(tf.int32, [None,])
@@ -88,6 +90,7 @@ class Model(object):
         tf.nn.embedding_lookup(item_emb_w, self.i),
         tf.nn.embedding_lookup(cate_emb_w, tf.gather(cate_list, self.i)),
         ], 1)
+    i_emb = tf.layers.dense(i_emb, self.config['hidden_units'])
     # 予測すべきアイテムの重み [B]
     i_b = tf.gather(item_b, self.i)
 

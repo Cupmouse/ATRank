@@ -1,4 +1,5 @@
 #テキスト表現はreviewTextでなく商品のタイトルを使う
+#商品説明文を入力
 import os
 import random
 import pickle
@@ -12,9 +13,9 @@ with open('../raw_data/reviews.pkl', 'rb') as f:
   reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime', 'reviewText']]
 with open('../raw_data/meta.pkl', 'rb') as f:
   meta_df = pickle.load(f)
-  meta_df = meta_df[['asin', 'categories', 'imUrl', 'title']]
+  meta_df = meta_df[['asin', 'categories', 'imUrl', 'description']]
 meta_df['categories'] = meta_df['categories'].map(lambda x: x[-1][-1])
-meta_df = meta_df.fillna({"title":''})
+meta_df = meta_df.fillna({"description":''})
 # URLを画像埋め込み表現を取得するためのキーへ変換する
 meta_df['imUrl'] = meta_df['imUrl'].map(lambda url: os.path.basename(url) if isinstance(url, str) else 'not_available')
 
@@ -33,7 +34,7 @@ asin_map, asin_key = build_map(meta_df, 'asin')
 cate_map, cate_key = build_map(meta_df, 'categories')
 revi_map, revi_key = build_map(reviews_df, 'reviewerID')
 img_map, img_key = build_map(meta_df, 'imUrl')
-tit_map, tit_key = build_map(meta_df, 'title')
+des_map, des_key = build_map(meta_df, 'description')
 
 user_count, item_count, cate_count, example_count =\
     len(revi_map), len(asin_map), len(cate_map), reviews_df.shape[0]
@@ -46,7 +47,6 @@ meta_df = meta_df.reset_index(drop=True)
 reviews_df['asin'] = reviews_df['asin'].map(lambda x: asin_map[x])
 reviews_df = reviews_df.sort_values(['reviewerID', 'unixReviewTime'])
 reviews_df = reviews_df.reset_index(drop=True)
-texts = np.array(reviews_df['reviewText'], dtype=object)
 reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
 
 # ASINの並び順に商品のカテゴリだけをとってきて配列にする
@@ -57,14 +57,14 @@ cate_list = np.array(cate_list, dtype=np.int32)
 img_list = np.array(meta_df['imUrl'], dtype=np.int32)
 
 # 商品のタイトルのID
-tit_list = np.array(meta_df['description'], dtype=np.int32)
+des_list = np.array(meta_df['description'], dtype=np.int32)
 
 # 書き出し
-with open('../raw_data/remap.pkl', 'wb') as f:
+with open('../raw_data/remap_meta.pkl', 'wb') as f:
   pickle.dump(reviews_df, f, pickle.HIGHEST_PROTOCOL) # uid, iid
   pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL) # cid of iid line
   pickle.dump((user_count, item_count, cate_count, example_count),
               f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((asin_key, cate_key, revi_key), f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((img_list, img_key), f, pickle.HIGHEST_PROTOCOL)
-  pickle.dump((tit_list, tit_key), f, pickle.HIGHEST_PROTOCOL)
+  pickle.dump((des_list, des_key), f, pickle.HIGHEST_PROTOCOL)

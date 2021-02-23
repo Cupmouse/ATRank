@@ -9,7 +9,7 @@ import itertools
 random.seed(1234)
 
 # user_count, item_count, cate_count, example_countはそれぞれユーザ、アイテム、カテゴリ、レビュー履歴の数
-with open('../raw_data/remap.pkl', 'rb') as f:
+with open('../raw_data/remap_meta.pkl', 'rb') as f:
   # asinが整数になっているレビューのデータ
   reviews_df = pickle.load(f)
   # asinでソートされた商品に対するカテゴリ（商品のカテゴリ）の羅列
@@ -17,7 +17,7 @@ with open('../raw_data/remap.pkl', 'rb') as f:
   user_count, item_count, cate_count, example_count = pickle.load(f)
   pickle.load(f)
   img_list, img_key = pickle.load(f)
-  tit_list, tit_key = pickle.load(f)
+  des_list, des_key = pickle.load(f)
 
 # 時間をカテゴリカルな値にするためのテーブル
 # [1, 2) = 0, [2, 4) = 1, [4, 8) = 2, [8, 16) = 3...  need len(gap) hot
@@ -108,13 +108,13 @@ assert len(test_set) == user_count
 # assert(len(test_set) + len(train_set) // 2 == reviews_df.shape[0])
 
 with open('../raw_data/text_embeddings.pkl', 'rb') as f:
-  tit_embeddings = pickle.load(f)
+  des_embeddings = pickle.load(f)
 
 # train_set・test_setは一つ一つのレビュー履歴についてユーザID、レビューしたアイテムID、これ以前にレビューしたアイテム、過去の履歴との時間差を含む
-with open('description_dataset.pkl', 'wb') as f:
+with open('meta_dataset.pkl', 'wb') as f:
   pickle.dump(train_set, f, pickle.HIGHEST_PROTOCOL)
   pickle.dump(test_set, f, pickle.HIGHEST_PROTOCOL)
   pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((user_count, item_count, cate_count), f, pickle.HIGHEST_PROTOCOL)
   pickle.dump((img_list, image_converted), f, pickle.HIGHEST_PROTOCOL)
-  pickle.dump((tit_list, tit_embeddings), f, pickle.HIGHEST_PROTOCOL)
+  pickle.dump((des_list, des_embeddings), f, pickle.HIGHEST_PROTOCOL)

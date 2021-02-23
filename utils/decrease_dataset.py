@@ -1,3 +1,4 @@
+#データセットを縮小する
 import csv
 import pprint
 import pandas as pd
