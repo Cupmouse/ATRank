@@ -47,8 +47,6 @@ class Model(object):
 
     self.r = tf.placeholder(tf.float32, [None, None, self.config['input_text_emb_size']])
     
-    self.r_i = tf.placeholder(tf.float32, [None, self.config['input_text_emb_size']])
-
     # [B] valid length of `hist_i`
     self.sl = tf.placeholder(tf.int32, [None,])
 

@@ -1,6 +1,7 @@
 """FastTextを利用して文章を変換する"""
 #文の前処理を入れる
 #nltkによる分かち書き、ステミング、ストップワード除去
+#商品説明文を変換
 
 import pickle
 import numpy as np
@@ -12,24 +13,22 @@ import re
 import gensim
 import tensorflow as tf
 import tensorflow_hub as hub
-import time
 
-with open('../raw_data/small_remap.pkl', 'rb') as f:
-  pickle.load(f)
-  pickle.load(f)
-  pickle.load(f)
-  pickle.load(f)
-  pickle.load(f)
-  text_list, text_key = pickle.load(f)
-
-#word2vec = gensim.models.KeyedVectors.load_word2vec_format('../raw_data/GoogleNews-vectors-negative300.bin',binary=True)
-fasttext = FastText.load_fasttext_format('../raw_data/cc.en.300.bin')
 stop_words = set(stopwords.words('english'))
 signals = re.compile('[^a-zA-Z0-9]+')
+fasttext = FastText.load_fasttext_format('../raw_data/cc.en.300.bin')
+
+with open('../raw_data/remap_meta.pkl', 'rb') as f:
+  pickle.load(f)
+  pickle.load(f)
+  pickle.load(f)
+  pickle.load(f)
+  pickle.load(f)
+  des_list, des_key = pickle.load(f)
 
 def sec2vec(sentence):
   sentence = signals.sub(' ', sentence)
-  global fasttext
+  #global fasttext
   # 文を単語に分ける
   words = tokenize.word_tokenize(sentence)
   # ストップワードフィルタリング
@@ -42,12 +41,13 @@ def sec2vec(sentence):
   return np.mean(words_vectors, axis=0)
 
 # レビュー文をベクトル化
-print('len of text_key:' + str(len(text_key)))
-r = np.ndarray((len(text_key), 300), dtype=np.float32)
-for i, sent in enumerate(text_key):
-  r[i] = sec2vec(sent)
-  if i % 10000 == 0:
-    print('%.2f%% done (%d/%d)' % ((i / len(text_key))*100, i, len(text_key)))
+r = np.ndarray((len(des_key), 300), dtype=np.float32)
+count_i = 0
 
-with open('../raw_data/text_embeddings_fasttext.pkl', 'wb') as f:
+for i in range(len(des_key)):
+  r[i] = sec2vec(des_key[i])
+  if i%5000 == 0:
+    print(i)
+    
+with open('../raw_data/text_embeddings.pkl', 'wb') as f:
   pickle.dump(r, f, pickle.HIGHEST_PROTOCOL)
